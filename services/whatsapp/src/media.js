@@ -6,7 +6,12 @@ async function saveImage(sock, msg) {
   try {
     const buffer = await downloadMediaMessage(msg, "buffer", {}, { reuploadRequest: sock.updateMediaMessage });
     const filename = `${Date.now()}.jpg`;
-    const filepath = path.join(__dirname, "..", "media", filename);
+    const mediaDir = path.join(__dirname, "..", "media");
+    if (!fs.existsSync(mediaDir)) {
+      fs.mkdirSync(mediaDir, { recursive: true });
+    }
+
+    const filepath = path.join(mediaDir, filename);
     
     fs.writeFileSync(filepath, buffer);
     console.log(`Image saved: ${filename}`);
