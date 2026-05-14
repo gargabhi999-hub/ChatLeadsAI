@@ -211,7 +211,7 @@ app.post('/logout', async (req, res) => {
   }
 });
 
-const PORT = process.env.CONTROL_PORT || 8001;
+const PORT = process.env.PORT || process.env.CONTROL_PORT || 8001;
 app.listen(PORT, async () => {
   console.log(`🚀 Multi-Session Hub running on port ${PORT}`);
   

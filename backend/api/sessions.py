@@ -6,6 +6,9 @@ from pydantic import BaseModel
 from typing import Optional
 import httpx
 import datetime
+import os
+
+WHATSAPP_SERVICE_URL = os.getenv("WHATSAPP_SERVICE_URL", "http://localhost:8001")
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -83,7 +86,7 @@ async def create_new_session(data: dict, db: Session = Depends(get_session)):
     # Notify WhatsApp Hub to start new instance
     try:
         async with httpx.AsyncClient() as client:
-            await client.post("http://localhost:8001/sessions/start", json={"session_id": session_id})
+            await client.post(f"{WHATSAPP_SERVICE_URL}/sessions/start", json={"session_id": session_id})
     except Exception as e:
         print(f"Error starting session in Hub: {e}")
 
@@ -104,7 +107,7 @@ async def revoke_session(session_id: str, db: Session = Depends(get_session)):
     
     try:
         async with httpx.AsyncClient() as client:
-            await client.post(f"http://localhost:8001/logout", json={"session_id": session_id})
+            await client.post(f"{WHATSAPP_SERVICE_URL}/logout", json={"session_id": session_id})
     except Exception as e:
         print(f"Error calling WhatsApp service: {e}")
     
@@ -142,7 +145,7 @@ async def delete_session(session_id: str, db: Session = Depends(get_session)):
         # 1. KILL the instance in the WhatsApp Hub
         try:
             async with httpx.AsyncClient() as client:
-                await client.post(f"http://localhost:8001/sessions/stop", json={"session_id": session_id})
+                await client.post(f"{WHATSAPP_SERVICE_URL}/sessions/stop", json={"session_id": session_id})
             
             # Give the device time to process the remote logout signal
             import asyncio
