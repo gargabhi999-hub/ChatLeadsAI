@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 import ollama
 import pytesseract
 from PIL import Image, ImageEnhance, ImageFilter
+import google.generativeai as genai
 
 load_dotenv()
 
@@ -62,6 +63,7 @@ class ExtractorService:
     def __init__(self):
         self.provider = os.getenv("AI_PROVIDER", "ollama").lower()
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
         self.client = None
         
         if self.openai_api_key:
@@ -69,6 +71,13 @@ class ExtractorService:
                 self.client = OpenAI(api_key=self.openai_api_key)
             except Exception as e:
                 print(f"Failed to initialize OpenAI client: {e}")
+                
+        if self.gemini_api_key:
+            try:
+                genai.configure(api_key=self.gemini_api_key)
+                self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+            except Exception as e:
+                print(f"Failed to initialize Gemini: {e}")
 
     def _parse_ai_json(self, content: str) -> Optional[Dict]:
         """Extracts and parses JSON from AI response with high tolerance."""
@@ -160,14 +169,20 @@ class ExtractorService:
         print(f"🤖 Calling AI Provider: {self.provider}...")
         if self.provider == "openai":
             result = await self._extract_openai(combined_text, context_str, image_bytes)
+        elif self.provider == "gemini":
+            result = await self._extract_gemini(combined_text, context_str, image_bytes)
         else:
             result = await self._extract_ollama(combined_text, context_str)
 
-        # Fallback to OpenAI if primary failed
-        if not result and self.provider != "openai" and os.getenv("OPENAI_API_KEY"):
-            if os.getenv("OPENAI_API_KEY") != "optional_if_provider_is_openai":
-                print("🔄 Primary provider failed, falling back to OpenAI Vision...")
-                result = await self._extract_openai(combined_text, context_str, image_bytes)
+        # Fallback 1: Gemini (Free)
+        if not result and self.gemini_api_key:
+            print("🔄 Falling back to Gemini Vision (Free Tier)...")
+            result = await self._extract_gemini(combined_text, context_str, image_bytes)
+
+        # Fallback 2: OpenAI
+        if not result and self.openai_api_key:
+            print("🔄 Falling back to OpenAI Vision...")
+            result = await self._extract_openai(combined_text, context_str, image_bytes)
 
         # Final Fallback: Regex Survival Mode
         if not result:
@@ -349,6 +364,22 @@ class ExtractorService:
             return self._parse_ai_json(response.choices[0].message.content)
         except Exception as e:
             print(f"OpenAI Error: {e}")
+            return None
+
+    async def _extract_gemini(self, text: str, context: Optional[str] = None, image_bytes: Optional[bytes] = None) -> Dict:
+        try:
+            prompt = get_system_prompt(text, context)
+            content = [prompt]
+            
+            if image_bytes:
+                image_parts = [{"mime_type": "image/jpeg", "data": image_bytes}]
+                content.append(Image.open(io.BytesIO(image_bytes)))
+                print("🖼️ Gemini Vision: Analyzing image content...")
+
+            response = self.gemini_model.generate_content(content)
+            return self._parse_ai_json(response.text)
+        except Exception as e:
+            print(f"Gemini Error: {e}")
             return None
 
 extractor = ExtractorService()
