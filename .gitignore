@@ -48,3 +48,8 @@ backend/.env
 frontend/.env.local
 frontend/node_modules/
 frontend/.next/
+services/whatsapp/node_modules/
+services/whatsapp/.env
+services/whatsapp/auth/
+services/whatsapp/auth_info/
+services/whatsapp/media/
