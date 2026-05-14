@@ -61,8 +61,14 @@ def get_system_prompt(text_content: str, context: Optional[str] = None) -> str:
 class ExtractorService:
     def __init__(self):
         self.provider = os.getenv("AI_PROVIDER", "ollama").lower()
-        if self.provider == "openai":
-            self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        self.client = None
+        
+        if self.openai_api_key:
+            try:
+                self.client = OpenAI(api_key=self.openai_api_key)
+            except Exception as e:
+                print(f"Failed to initialize OpenAI client: {e}")
 
     def _parse_ai_json(self, content: str) -> Optional[Dict]:
         """Extracts and parses JSON from AI response with high tolerance."""
@@ -325,6 +331,13 @@ class ExtractorService:
                     "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
                 })
                 print("🖼️ OpenAI Vision: Sending image for direct analysis...")
+
+            if not self.client:
+                # Late initialization if needed
+                if self.openai_api_key:
+                    self.client = OpenAI(api_key=self.openai_api_key)
+                else:
+                    raise Exception("OpenAI API Key missing")
 
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",  # Using mini for faster response
