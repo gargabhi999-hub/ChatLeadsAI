@@ -51,26 +51,37 @@ def get_sessions(db: Session = Depends(get_session)):
 
 @router.get("/export")
 async def export_contacts(
-    session_ids: List[str] = Query(..., description="List of session IDs to export"),
+    session_id: Optional[str] = None,
+    score: Optional[str] = None,
+    query: Optional[str] = None,
     db: Session = Depends(get_session)
 ):
     """
-    Export leads from selected sessions to Excel
+    Export leads applying all dashboard filters to Excel
     """
     import pandas as pd
     import io
     from fastapi.responses import StreamingResponse
     
-    if not session_ids:
-        raise HTTPException(status_code=400, detail="Please select at least one session")
+    print(f"📊 Exporting leads with filters: session={session_id}, score={score}, query={query}")
     
-    print(f"📊 Exporting leads from sessions: {session_ids}")
+    statement = select(Contact).order_by(Contact.created_at.desc())
     
-    statement = select(Contact).where(Contact.session_id.in_(session_ids)).order_by(Contact.created_at.desc())
+    if session_id:
+        statement = statement.where(Contact.session_id == session_id)
+    if score:
+        statement = statement.where(Contact.lead_score == score)
+    if query:
+        statement = statement.where(
+            (Contact.extracted_name.contains(query)) | 
+            (Contact.email.contains(query)) | 
+            (Contact.mobile.contains(query))
+        )
+    
     contacts = db.exec(statement).all()
     
     if not contacts:
-        raise HTTPException(status_code=404, detail="No leads found for selected sessions")
+        raise HTTPException(status_code=404, detail="No leads found matching the selected filters")
 
     # Prepare data for Excel
     data = []
@@ -98,15 +109,17 @@ async def export_contacts(
         df.to_excel(writer, index=False, sheet_name='All Leads')
         
         # Summary sheet
-        summary = df.groupby(['Session ID', 'Lead Score']).size().unstack(fill_value=0)
-        summary.to_excel(writer, sheet_name='Summary')
-        
-        # Per session sheets
-        for session_id in session_ids:
-            session_df = df[df['Session ID'] == session_id]
-            if not session_df.empty:
-                sheet_name = session_id[:31]  # Excel sheet name max 31 chars
-                session_df.to_excel(writer, index=False, sheet_name=sheet_name)
+        if not df.empty:
+            summary = df.groupby(['Session ID', 'Lead Score']).size().unstack(fill_value=0)
+            summary.to_excel(writer, sheet_name='Summary')
+            
+            # Per session sheets
+            session_ids_present = df['Session ID'].unique()
+            for s_id in session_ids_present:
+                session_df = df[df['Session ID'] == s_id]
+                if not session_df.empty:
+                    sheet_name = str(s_id)[:31]  # Excel sheet name max 31 chars
+                    session_df.to_excel(writer, index=False, sheet_name=sheet_name)
     
     output.seek(0)
     

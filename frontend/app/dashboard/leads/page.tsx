@@ -73,7 +73,12 @@ export default function LeadsPage() {
   };
 
   const handleExport = () => {
-    window.location.href = `${apiUrl}/contacts/export`;
+    const params = new URLSearchParams();
+    if (searchTerm) params.append('query', searchTerm);
+    if (filterSession) params.append('session_id', filterSession);
+    if (filterScore) params.append('score', filterScore);
+
+    window.location.href = `${apiUrl}/contacts/export?${params.toString()}`;
   };
 
   const confirmDelete = async () => {
