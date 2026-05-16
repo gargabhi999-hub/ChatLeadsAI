@@ -34,20 +34,24 @@ def get_contacts(
 
 @router.get("/sessions")
 def get_sessions(db: Session = Depends(get_session)):
-    """Get all available WhatsApp sessions with lead counts"""
-    sessions = db.exec(select(WhatsAppSession)).all()
-    result = []
-    for session in sessions:
-        lead_count = db.exec(
-            select(Contact).where(Contact.session_id == session.session_id)
-        ).all()
-        result.append({
-            "session_id": session.session_id,
-            "status": session.status,
-            "lead_count": len(lead_count),
-            "created_at": session.created_at
-        })
-    return result
+    """Get all available WhatsApp sessions with lead counts directly from contacts"""
+    from sqlalchemy import func
+    
+    # Get distinct session IDs and their lead counts directly from the Contact table
+    statement = select(Contact.session_id, func.count(Contact.id)).group_by(Contact.session_id)
+    results = db.exec(statement).all()
+    
+    sessions_data = []
+    for session_id, count in results:
+        if session_id:
+            sessions_data.append({
+                "session_id": session_id,
+                "status": "archived/active",
+                "lead_count": count,
+                "created_at": None
+            })
+            
+    return sessions_data
 
 @router.get("/export")
 async def export_contacts(
