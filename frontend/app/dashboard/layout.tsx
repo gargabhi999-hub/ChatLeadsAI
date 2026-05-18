@@ -1,95 +1,271 @@
-import React from 'react';
-import { 
-  LayoutDashboard, 
-  Users, 
-  MessageSquare, 
-  Settings, 
+'use client';
+
+import React, { useState } from 'react';
+import {
+  LayoutDashboard,
+  Users,
+  MessageSquare,
+  Settings,
   LogOut,
   Zap,
-  Bell
+  Bell,
+  ChevronRight,
+  Activity,
+  Menu,
+  X
 } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
-export default function DashboardLayout({
-  children,
+function NavItem({
+  icon,
+  label,
+  href,
+  active,
+  onClick,
 }: {
-  children: React.ReactNode;
+  icon: React.ReactNode;
+  label: string;
+  href: string;
+  active: boolean;
+  onClick?: () => void;
 }) {
   return (
-    <div className="flex h-screen bg-[#f8fafc] text-[#1e293b] overflow-hidden font-sans">
-      {/* Sidebar */}
-      <aside className="w-72 border-r border-slate-200 bg-white flex flex-col p-8 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-        <div className="flex items-center gap-3 mb-12 px-2">
-          <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-200 animate-float">
-            <Zap size={28} className="text-white fill-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black tracking-tight text-slate-900">ChatLeads</h1>
-            <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Enterprise AI</p>
+    <a
+      href={href}
+      onClick={onClick}
+      className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 group font-bold text-sm relative overflow-hidden ${
+        active
+          ? 'nav-active text-purple-300'
+          : 'text-[#6b6190] hover:text-[#a89fd4] hover:bg-[rgba(139,92,246,0.06)]'
+      }`}
+    >
+      <span className={`transition-colors ${active ? 'text-purple-400' : 'text-[#3d3660] group-hover:text-purple-500'}`}>
+        {icon}
+      </span>
+      <span className="tracking-tight">{label}</span>
+      {active && (
+        <span className="ml-auto">
+          <ChevronRight size={14} className="text-purple-400 opacity-60" />
+        </span>
+      )}
+    </a>
+  );
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [notifications] = useState(3);
+
+  const navItems = [
+    { href: '/dashboard', label: 'Overview', icon: <LayoutDashboard size={20} /> },
+    { href: '/dashboard/leads', label: 'Leads', icon: <Users size={20} /> },
+    { href: '/dashboard/whatsapp', label: 'WhatsApp', icon: <MessageSquare size={20} /> },
+    { href: '/dashboard/settings', label: 'Settings', icon: <Settings size={20} /> },
+  ];
+
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="flex items-center gap-3 mb-10 px-2">
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center animate-float relative overflow-hidden"
+          style={{
+            background: 'linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)',
+            border: '1px solid rgba(139,92,246,0.4)',
+            boxShadow: '0 0 30px rgba(124,58,237,0.4)',
+          }}>
+          <div className="absolute inset-0"
+            style={{ background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), transparent)' }} />
+          <Zap size={26} className="text-white fill-white relative z-10" />
+        </div>
+        <div>
+          <h1 className="text-xl font-black tracking-tight text-white">ChatLeads</h1>
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+            <p className="text-[10px] font-bold uppercase tracking-widest text-purple-500">Dark Nexus AI</p>
           </div>
         </div>
+      </div>
 
-        <nav className="flex-1 space-y-2">
-          <NavItem icon={<LayoutDashboard size={20} />} label="Overview" active href="/dashboard" />
-          <NavItem icon={<Users size={20} />} label="Leads" href="/dashboard/leads" />
-          <NavItem icon={<MessageSquare size={20} />} label="WhatsApp" href="/dashboard/whatsapp" />
-          <NavItem icon={<Settings size={20} />} label="Settings" href="/dashboard/settings" />
-        </nav>
+      {/* Section label */}
+      <p className="text-[9px] font-black uppercase tracking-[0.3em] mb-3 px-5"
+        style={{ color: '#3d3660' }}>
+        Navigation
+      </p>
 
-        <div className="mt-auto pt-8 border-t border-slate-100">
-          <button className="flex items-center gap-3 px-4 py-4 text-slate-400 hover:text-red-500 transition-all w-full rounded-2xl hover:bg-red-50 group font-bold">
-            <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
-            <span>Sign Out</span>
-          </button>
+      {/* Nav */}
+      <nav className="flex-1 space-y-1.5">
+        {navItems.map((item) => (
+          <NavItem
+            key={item.href}
+            {...item}
+            active={
+              item.href === '/dashboard'
+                ? pathname === '/dashboard'
+                : pathname.startsWith(item.href)
+            }
+            onClick={() => setMobileOpen(false)}
+          />
+        ))}
+      </nav>
+
+      {/* System status */}
+      <div className="mt-6 p-5 rounded-2xl mb-6"
+        style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(16,185,129,0.15)' }}>
+            <Activity size={16} className="text-emerald-400" />
+          </div>
+          <p className="text-xs font-black text-emerald-400 uppercase tracking-wider">System Online</p>
         </div>
+        <div className="space-y-2">
+          {['API', 'WebSocket', 'AI Engine'].map((s) => (
+            <div key={s} className="flex items-center justify-between">
+              <span className="text-[10px] font-bold" style={{ color: '#6b6190' }}>{s}</span>
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-black text-emerald-500">OK</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Sign Out */}
+      <div className="pt-4 border-t" style={{ borderColor: 'rgba(139,92,246,0.08)' }}>
+        <button className="flex items-center gap-3 px-5 py-4 text-sm font-bold w-full rounded-2xl transition-all duration-300 group"
+          style={{ color: '#6b6190' }}
+          onMouseEnter={e => {
+            e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.08)';
+            e.currentTarget.style.color = '#ef4444';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = '#6b6190';
+          }}>
+          <LogOut size={18} className="group-hover:-translate-x-1 transition-transform" />
+          <span>Sign Out</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex h-screen overflow-hidden"
+      style={{ background: '#050508' }}>
+
+      {/* ── Desktop Sidebar ── */}
+      <aside className="hidden lg:flex w-72 flex-col p-6 relative z-20"
+        style={{
+          background: 'rgba(8,8,16,0.95)',
+          borderRight: '1px solid rgba(139,92,246,0.08)',
+          backdropFilter: 'blur(20px)',
+        }}>
+        {/* Sidebar glow */}
+        <div className="absolute top-0 right-0 w-px h-full pointer-events-none"
+          style={{ background: 'linear-gradient(180deg, transparent, rgba(139,92,246,0.3) 30%, rgba(139,92,246,0.15) 70%, transparent)' }} />
+        <SidebarContent />
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="h-20 border-b border-slate-200 bg-white/70 backdrop-blur-xl flex items-center justify-between px-10 z-10">
-          <div className="flex items-center gap-4">
-             <div className="px-4 py-1.5 bg-indigo-50 rounded-full border border-indigo-100 text-[11px] font-bold text-indigo-600 uppercase tracking-wider">
-               System Active
-             </div>
-          </div>
-          
-          <div className="flex items-center gap-6">
-            <button className="p-2 text-slate-400 hover:text-indigo-600 transition-colors relative">
-              <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+      {/* ── Mobile Sidebar Overlay ── */}
+      {mobileOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <aside className="relative w-72 flex flex-col p-6 z-10"
+            style={{ background: 'rgba(8,8,16,0.98)', borderRight: '1px solid rgba(139,92,246,0.15)' }}>
+            <button className="absolute top-4 right-4 p-2 rounded-xl text-purple-400"
+              style={{ background: 'rgba(139,92,246,0.1)' }}
+              onClick={() => setMobileOpen(false)}>
+              <X size={18} />
             </button>
-            <div className="h-8 w-px bg-slate-200" />
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-sm font-black text-slate-900">Lakshay</p>
-                <p className="text-[11px] font-medium text-slate-400">System Admin</p>
+            <SidebarContent />
+          </aside>
+        </div>
+      )}
+
+      {/* ── Main ── */}
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+
+        {/* ── Header ── */}
+        <header className="h-20 flex items-center justify-between px-8 z-10 relative shrink-0"
+          style={{
+            background: 'rgba(5,5,8,0.9)',
+            borderBottom: '1px solid rgba(139,92,246,0.08)',
+            backdropFilter: 'blur(20px)',
+          }}>
+
+          <div className="flex items-center gap-4">
+            {/* Mobile menu */}
+            <button className="lg:hidden p-2.5 rounded-xl transition-all"
+              style={{ background: 'rgba(139,92,246,0.08)', color: '#a89fd4' }}
+              onClick={() => setMobileOpen(true)}>
+              <Menu size={20} />
+            </button>
+
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-2">
+              <div className="px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(124,58,237,0.15), rgba(139,92,246,0.08))',
+                  border: '1px solid rgba(139,92,246,0.2)',
+                  color: '#a78bfa',
+                }}>
+                <span className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                  System Active
+                </span>
               </div>
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 border-2 border-white shadow-lg shadow-indigo-100" />
+            </div>
+          </div>
+
+          {/* Right */}
+          <div className="flex items-center gap-5">
+            {/* Notifications */}
+            <button className="relative p-2.5 rounded-xl transition-all"
+              style={{ background: 'rgba(139,92,246,0.06)', color: '#6b6190' }}
+              onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(139,92,246,0.12)'; e.currentTarget.style.color = '#a78bfa'; }}
+              onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(139,92,246,0.06)'; e.currentTarget.style.color = '#6b6190'; }}>
+              <Bell size={20} />
+              {notifications > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-purple-500 border-2"
+                  style={{ borderColor: '#050508', boxShadow: '0 0 8px rgba(139,92,246,0.8)' }} />
+              )}
+            </button>
+
+            <div className="w-px h-8" style={{ background: 'rgba(139,92,246,0.15)' }} />
+
+            {/* User */}
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-sm font-black text-white">Lakshay</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#6b6190' }}>
+                  System Admin
+                </p>
+              </div>
+              <div className="w-11 h-11 rounded-2xl relative overflow-hidden"
+                style={{
+                  background: 'linear-gradient(135deg, #7c3aed, #ec4899)',
+                  border: '2px solid rgba(139,92,246,0.3)',
+                  boxShadow: '0 0 20px rgba(124,58,237,0.3)',
+                }}>
+                <div className="absolute inset-0 flex items-center justify-center text-white font-black text-sm">L</div>
+              </div>
             </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-10 custom-scrollbar scroll-smooth">
-          {children}
+        {/* ── Content ── */}
+        <div className="flex-1 overflow-y-auto p-8 lg:p-10 custom-scrollbar relative"
+          style={{ background: '#050508' }}>
+          {/* Content glow */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-64 pointer-events-none"
+            style={{ background: 'radial-gradient(ellipse 60% 100% at 50% 0%, rgba(124,58,237,0.05) 0%, transparent 100%)' }} />
+          <div className="relative z-10">
+            {children}
+          </div>
         </div>
       </main>
     </div>
-  );
-}
-
-function NavItem({ icon, label, active = false, href }: { icon: React.ReactNode, label: string, active?: boolean, href: string }) {
-  return (
-    <a 
-      href={href}
-      className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 group ${
-        active 
-          ? 'bg-indigo-600 text-white shadow-2xl shadow-indigo-200 translate-x-2' 
-          : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/50'
-      }`}
-    >
-      <span className={`${active ? 'text-white' : 'text-slate-400 group-hover:text-indigo-500'} transition-colors`}>
-        {icon}
-      </span>
-      <span className="font-bold tracking-tight">{label}</span>
-    </a>
   );
 }

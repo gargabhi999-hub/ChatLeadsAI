@@ -1,137 +1,395 @@
-import React from 'react';
-import { 
-  Zap, 
-  Shield, 
-  Smartphone, 
-  BarChart3, 
+'use client';
+
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Zap,
+  Shield,
+  Smartphone,
+  BarChart3,
   ArrowRight,
-  CheckCircle2,
   Lock,
-  Globe
+  Globe,
+  Cpu,
+  Eye,
+  Activity,
+  Sparkles,
+  ChevronRight
 } from 'lucide-react';
 
-export default function LandingPage() {
+/* ─── Animated Counter ──────────────────────────────────── */
+function Counter({ end, suffix = '' }: { end: number; suffix?: string }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      let start = 0;
+      const step = Math.ceil(end / 60);
+      const timer = setInterval(() => {
+        start = Math.min(start + step, end);
+        setCount(start);
+        if (start >= end) clearInterval(timer);
+      }, 20);
+      observer.disconnect();
+    });
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [end]);
+
+  return <span ref={ref}>{count}{suffix}</span>;
+}
+
+/* ─── Floating Particle ──────────────────────────────────── */
+function Particle({ delay, x, size }: { delay: number; x: number; size: number }) {
   return (
-    <div className="min-h-screen bg-white text-slate-900 selection:bg-indigo-100 selection:text-indigo-700 font-sans">
-      {/* Navbar */}
-      <nav className="fixed top-0 w-full z-50 border-b border-slate-100 bg-white/70 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-8 h-24 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-xl shadow-indigo-100">
-              <Zap size={24} className="fill-white text-white" />
-            </div>
-            <span className="text-2xl font-black tracking-tight">ChatLeads</span>
-          </div>
-          <div className="hidden md:flex items-center gap-10 text-sm font-bold text-slate-400">
-            <a href="#" className="hover:text-indigo-600 transition-colors">Technology</a>
-            <a href="#" className="hover:text-indigo-600 transition-colors">Pricing</a>
-            <a href="#" className="hover:text-indigo-600 transition-colors">Security</a>
-          </div>
-          <a href="/dashboard" className="px-8 py-3.5 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-700 transition-all active:scale-95 shadow-xl shadow-indigo-100">
-            Access Dashboard
-          </a>
-        </div>
-      </nav>
+    <div
+      className="absolute rounded-full opacity-20 pointer-events-none"
+      style={{
+        left: `${x}%`,
+        bottom: '-20px',
+        width: size,
+        height: size,
+        background: 'radial-gradient(circle, #8b5cf6, transparent)',
+        animation: `particle-float ${3 + delay}s ease-out ${delay}s infinite`,
+      }}
+    />
+  );
+}
 
-      {/* Hero Section */}
-      <section className="pt-48 pb-32 px-8 relative overflow-hidden">
-        {/* Animated Background Blobs */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl h-[600px] bg-indigo-50/50 blur-[120px] -z-10 rounded-full animate-pulse" />
-        
-        <div className="max-w-5xl mx-auto text-center space-y-10">
-          <div className="inline-flex items-center gap-3 px-5 py-2 rounded-full bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-[0.2em] border border-indigo-100 shadow-sm">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-600"></span>
-            </span>
-            Next-Gen AI Extraction
-          </div>
-          
-          <h1 className="text-7xl md:text-8xl font-black tracking-tight leading-[0.95] text-slate-900">
-            Turn WhatsApp into your <span className="text-indigo-600">Growth Engine.</span>
-          </h1>
-          
-          <p className="text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed font-medium">
-            The world's first local-first lead extraction platform. Capture contacts from text and images with enterprise-grade privacy.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-6">
-            <a href="/dashboard" className="w-full sm:w-auto px-10 py-5 bg-indigo-600 text-white rounded-[2rem] font-black text-lg hover:bg-indigo-700 shadow-2xl shadow-indigo-200 transition-all flex items-center justify-center gap-3 group active:scale-95">
-              Launch Platform <ArrowRight size={24} className="group-hover:translate-x-1 transition-transform" />
-            </a>
-            <button className="w-full sm:w-auto px-10 py-5 bg-white border border-slate-200 text-slate-900 rounded-[2rem] font-black text-lg hover:bg-slate-50 transition-all active:scale-95 shadow-sm">
-              View Architecture
-            </button>
-          </div>
-        </div>
-
-        {/* 3D Dashboard Mockup Effect */}
-        <div className="max-w-6xl mx-auto mt-32 relative perspective-1000">
-          <div className="absolute -inset-10 bg-indigo-100/50 rounded-[4rem] blur-3xl -z-10 opacity-50" />
-          <div className="relative bg-white border border-slate-100 rounded-[3rem] p-4 shadow-[0_40px_100px_rgba(0,0,0,0.06)] transform hover:rotate-x-1 transition-transform duration-700 ease-out">
-            <div className="bg-slate-50 rounded-[2rem] aspect-[16/9] flex items-center justify-center group overflow-hidden">
-               <div className="text-center space-y-6">
-                 <div className="w-24 h-24 bg-white rounded-3xl shadow-2xl flex items-center justify-center mx-auto animate-float">
-                    <Zap size={48} className="text-indigo-600 fill-indigo-600/10" />
-                 </div>
-                 <h3 className="text-3xl font-black text-slate-900">Real-time Intelligence</h3>
-                 <div className="flex gap-2 justify-center">
-                    {[1,2,3,4].map(i => <div key={i} className="w-3 h-3 rounded-full bg-indigo-200 animate-pulse" style={{ animationDelay: `${i * 0.2}s` }} />)}
-                 </div>
-               </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Feature Grid */}
-      <section className="py-32 px-8 border-t border-slate-100 bg-slate-50/30">
-        <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-16">
-          <LandingFeature 
-            icon={<Globe size={40} className="text-indigo-600" />}
-            title="Global Sync"
-            desc="Connect any WhatsApp account worldwide and start extracting leads in milliseconds."
-          />
-          <LandingFeature 
-            icon={<Lock size={40} className="text-indigo-600" />}
-            title="Sovereign Data"
-            desc="We don't store your keys. Everything runs on your local infrastructure for max security."
-          />
-          <LandingFeature 
-            icon={<BarChart3 size={40} className="text-indigo-600" />}
-            title="Visual Intelligence"
-            desc="Built-in OCR processes business cards and images as easily as plain text messages."
-          />
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="py-32 px-8 text-center bg-white relative">
-         <div className="max-w-4xl mx-auto space-y-8">
-            <h2 className="text-5xl font-black tracking-tight">Ready to scale your extraction?</h2>
-            <p className="text-slate-500 font-medium">Join 500+ businesses automating their inbound WhatsApp leads.</p>
-            <a href="/dashboard" className="inline-flex px-12 py-6 bg-slate-900 text-white rounded-[2.5rem] font-black text-xl hover:bg-slate-800 transition-all shadow-2xl active:scale-95">
-              Access the Console
-            </a>
-         </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-16 border-t border-slate-100 text-center">
-        <p className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-300">© 2026 ChatLeads AI • All Systems Operational</p>
-      </footer>
+/* ─── Feature Card ─────────────────────────────────────── */
+function FeatureCard({ icon, title, desc, delay }: { icon: React.ReactNode; title: string; desc: string; delay: number }) {
+  return (
+    <div
+      className="glass-card glass-card-hover rounded-3xl p-10 group cursor-default"
+      style={{ animationDelay: `${delay}s` }}
+    >
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-8 relative overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.2) 0%, rgba(139,92,246,0.1) 100%)', border: '1px solid rgba(139,92,246,0.25)' }}>
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+          style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.4) 0%, rgba(139,92,246,0.2) 100%)' }} />
+        <span className="relative z-10 text-purple-400 group-hover:text-purple-300 transition-colors">{icon}</span>
+      </div>
+      <h3 className="text-xl font-black text-white mb-4 tracking-tight">{title}</h3>
+      <p className="text-sm leading-relaxed" style={{ color: '#a89fd4' }}>{desc}</p>
+      <div className="flex items-center gap-2 mt-6 text-xs font-bold uppercase tracking-widest text-purple-500 opacity-0 group-hover:opacity-100 transition-all duration-300">
+        Learn More <ChevronRight size={14} />
+      </div>
     </div>
   );
 }
 
-function LandingFeature({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
+/* ─── Stat Pill ──────────────────────────────────────────── */
+function StatPill({ label, value, suffix }: { label: string; value: number; suffix?: string }) {
   return (
-    <div className="space-y-6 group">
-      <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center group-hover:scale-110 group-hover:shadow-xl transition-all duration-500 border border-slate-100 shadow-sm">
-        {icon}
+    <div className="glass-card rounded-2xl px-8 py-6 text-center" style={{ border: '1px solid rgba(139,92,246,0.15)' }}>
+      <p className="text-3xl font-black gradient-text mb-1">
+        <Counter end={value} suffix={suffix} />
+      </p>
+      <p className="text-xs uppercase tracking-widest font-bold" style={{ color: '#6b6190' }}>{label}</p>
+    </div>
+  );
+}
+
+/* ─── Main Page ──────────────────────────────────────────── */
+export default function LandingPage() {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  return (
+    <div className="min-h-screen relative overflow-hidden" style={{ background: '#050508' }}>
+
+      {/* ── Ambient Background Effects ── */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[600px] opacity-30"
+          style={{ background: 'radial-gradient(ellipse, rgba(124,58,237,0.4) 0%, transparent 70%)', filter: 'blur(80px)' }} />
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] opacity-15"
+          style={{ background: 'radial-gradient(ellipse, rgba(236,72,153,0.5) 0%, transparent 70%)', filter: 'blur(100px)' }} />
+        <div className="absolute top-1/2 left-0 w-[400px] h-[400px] opacity-10"
+          style={{ background: 'radial-gradient(ellipse, rgba(6,182,212,0.5) 0%, transparent 70%)', filter: 'blur(80px)' }} />
+        {/* Grid pattern */}
+        <div className="absolute inset-0 opacity-[0.02]"
+          style={{ backgroundImage: 'linear-gradient(rgba(139,92,246,1) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,1) 1px, transparent 1px)', backgroundSize: '80px 80px' }} />
       </div>
-      <h3 className="text-2xl font-black text-slate-900 tracking-tight">{title}</h3>
-      <p className="text-slate-500 font-medium leading-relaxed">{desc}</p>
+
+      {/* ── Navbar ── */}
+      <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${scrolled ? 'backdrop-blur-2xl border-b' : ''}`}
+        style={{ backgroundColor: scrolled ? 'rgba(5,5,8,0.85)' : 'transparent', borderColor: 'rgba(139,92,246,0.1)' }}>
+        <div className="max-w-7xl mx-auto px-8 h-24 flex items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center animate-pulse-glow relative overflow-hidden"
+              style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)', border: '1px solid rgba(139,92,246,0.4)' }}>
+              <div className="absolute inset-0 opacity-50"
+                style={{ background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2), transparent)' }} />
+              <Zap size={22} className="text-white fill-white relative z-10" />
+            </div>
+            <div>
+              <span className="text-xl font-black tracking-tight text-white">ChatLeads</span>
+              <span className="ml-1 text-xs font-black text-purple-400">AI</span>
+            </div>
+          </div>
+
+          {/* Nav Links */}
+          <div className="hidden md:flex items-center gap-10">
+            {['Technology', 'Pricing', 'Security', 'Docs'].map((item) => (
+              <a key={item} href="#"
+                className="text-sm font-bold transition-all duration-300 hover:text-purple-400 relative group"
+                style={{ color: '#6b6190' }}>
+                {item}
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 group-hover:w-full transition-all duration-300"
+                  style={{ background: 'linear-gradient(90deg, #7c3aed, #a78bfa)' }} />
+              </a>
+            ))}
+          </div>
+
+          {/* CTA */}
+          <a href="/dashboard"
+            className="btn-primary px-7 py-3.5 rounded-2xl text-sm flex items-center gap-2 group">
+            Access Dashboard
+            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+          </a>
+        </div>
+      </nav>
+
+      {/* ── Hero ── */}
+      <section className="relative z-10 pt-52 pb-32 px-8">
+        <div className="max-w-6xl mx-auto">
+          {/* Badge */}
+          <div className="flex justify-center mb-10">
+            <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-[0.2em]"
+              style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa' }}>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                  style={{ backgroundColor: '#8b5cf6' }} />
+                <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: '#8b5cf6' }} />
+              </span>
+              Live AI Extraction Engine Active
+              <Sparkles size={12} />
+            </div>
+          </div>
+
+          {/* Headline */}
+          <h1 className="text-center text-7xl md:text-8xl font-black tracking-tight leading-[0.92] mb-10 animate-fade-in">
+            <span className="text-white">Turn WhatsApp</span><br />
+            <span className="gradient-text animate-neon-pulse">into Leads.</span>
+          </h1>
+
+          {/* Sub */}
+          <p className="text-center text-xl max-w-2xl mx-auto leading-relaxed mb-14 animate-fade-in delay-200"
+            style={{ color: '#a89fd4' }}>
+            The world's first privacy-first lead extraction platform. Capture contacts from text and images with enterprise-grade AI intelligence.
+          </p>
+
+          {/* CTAs */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-5 animate-fade-in delay-300">
+            <a href="/dashboard"
+              className="btn-primary w-full sm:w-auto px-10 py-5 rounded-2xl text-base font-black flex items-center justify-center gap-3 group">
+              <Zap size={20} className="fill-white" />
+              Launch Platform
+              <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+            </a>
+            <a href="/dashboard/whatsapp"
+              className="btn-ghost w-full sm:w-auto px-10 py-5 rounded-2xl text-base font-black flex items-center justify-center gap-3 group"
+              style={{ color: '#a89fd4' }}>
+              <Smartphone size={20} />
+              Connect WhatsApp
+            </a>
+          </div>
+
+          {/* Stats Row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-24 animate-fade-in delay-400">
+            <StatPill label="Leads Captured" value={50000} suffix="+" />
+            <StatPill label="Active Sessions" value={500} suffix="+" />
+            <StatPill label="Accuracy Rate" value={99} suffix="%" />
+            <StatPill label="Extraction Speed" value={420} suffix="ms" />
+          </div>
+        </div>
+
+        {/* Floating particles */}
+        <div className="absolute bottom-0 left-0 right-0 h-64 overflow-hidden pointer-events-none">
+          {[...Array(8)].map((_, i) => (
+            <Particle key={i} delay={i * 0.5} x={10 + i * 12} size={4 + (i % 3) * 4} />
+          ))}
+        </div>
+      </section>
+
+      {/* ── 3D Dashboard Mockup ── */}
+      <section className="relative z-10 px-8 pb-24">
+        <div className="max-w-6xl mx-auto">
+          <div className="card-3d">
+            <div className="relative rounded-3xl overflow-hidden"
+              style={{
+                background: 'rgba(13,13,26,0.8)',
+                border: '1px solid rgba(139,92,246,0.2)',
+                boxShadow: '0 40px 120px rgba(0,0,0,0.6), 0 0 80px rgba(124,58,237,0.15)',
+              }}>
+              {/* Window bar */}
+              <div className="flex items-center gap-3 px-6 py-4 border-b"
+                style={{ borderColor: 'rgba(139,92,246,0.1)', background: 'rgba(8,8,16,0.5)' }}>
+                {['#ef4444','#f59e0b','#10b981'].map((c, i) => (
+                  <div key={i} className="w-3 h-3 rounded-full" style={{ backgroundColor: c }} />
+                ))}
+                <div className="flex-1 flex justify-center">
+                  <div className="px-8 py-1.5 rounded-lg text-xs font-bold"
+                    style={{ background: 'rgba(139,92,246,0.1)', color: '#6b6190', border: '1px solid rgba(139,92,246,0.1)' }}>
+                    chatleads.ai/dashboard
+                  </div>
+                </div>
+              </div>
+
+              {/* Mock Content */}
+              <div className="p-8 grid grid-cols-3 gap-6" style={{ minHeight: '340px' }}>
+                {/* Stat cards mock */}
+                {[
+                  { label: 'Total Leads', val: '2,847', color: '#8b5cf6' },
+                  { label: 'Active Fleet', val: '12', color: '#10b981' },
+                  { label: 'Hot Ratio', val: '68%', color: '#f59e0b' },
+                ].map((s, i) => (
+                  <div key={i} className="rounded-2xl p-6 animate-fade-in"
+                    style={{ background: 'rgba(139,92,246,0.05)', border: `1px solid rgba(139,92,246,0.1)`, animationDelay: `${i * 0.15}s` }}>
+                    <div className="w-10 h-10 rounded-xl mb-4 flex items-center justify-center"
+                      style={{ background: `rgba(${s.color === '#8b5cf6' ? '139,92,246' : s.color === '#10b981' ? '16,185,129' : '245,158,11'},0.15)` }}>
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color, boxShadow: `0 0 10px ${s.color}` }} />
+                    </div>
+                    <p className="text-2xl font-black text-white mb-1">{s.val}</p>
+                    <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#6b6190' }}>{s.label}</p>
+                  </div>
+                ))}
+                {/* Activity mock */}
+                <div className="col-span-3 rounded-2xl p-6"
+                  style={{ background: 'rgba(139,92,246,0.03)', border: '1px solid rgba(139,92,246,0.08)' }}>
+                  <div className="flex items-end gap-3 h-20">
+                    {[30, 65, 45, 80, 55, 90, 70, 85, 60, 95, 75, 88].map((h, i) => (
+                      <div key={i} className="flex-1 rounded-t-lg transition-all duration-1000"
+                        style={{
+                          height: `${h}%`,
+                          background: `linear-gradient(180deg, rgba(139,92,246,${0.3 + h / 300}) 0%, rgba(109,40,217,0.2) 100%)`,
+                          border: '1px solid rgba(139,92,246,0.15)',
+                          animationDelay: `${i * 0.05}s`
+                        }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Glow overlay */}
+              <div className="absolute inset-0 pointer-events-none rounded-3xl"
+                style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.03) 0%, transparent 60%)' }} />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Features ── */}
+      <section className="relative z-10 py-32 px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-20">
+            <p className="text-xs font-black uppercase tracking-[0.4em] mb-5" style={{ color: '#7c3aed' }}>
+              Engineered For Scale
+            </p>
+            <h2 className="text-5xl font-black tracking-tight text-white mb-6">
+              Built For <span className="gradient-text">Intelligence</span>
+            </h2>
+            <p className="max-w-xl mx-auto" style={{ color: '#a89fd4' }}>
+              Every feature is precision-engineered to capture, analyze, and convert WhatsApp conversations into actionable leads.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            <FeatureCard
+              icon={<Globe size={28} />}
+              title="Global Sync Engine"
+              desc="Connect any WhatsApp account worldwide and start extracting leads in milliseconds with our always-on infrastructure."
+              delay={0}
+            />
+            <FeatureCard
+              icon={<Lock size={28} />}
+              title="Sovereign Data Control"
+              desc="Zero-knowledge architecture. Your keys never leave your system. Enterprise-grade privacy by design."
+              delay={0.1}
+            />
+            <FeatureCard
+              icon={<Eye size={28} />}
+              title="Visual Intelligence OCR"
+              desc="Built-in AI vision processes business cards and images as easily as plain text — powered by Gemini 2.5."
+              delay={0.2}
+            />
+            <FeatureCard
+              icon={<Activity size={28} />}
+              title="Real-Time WebSocket"
+              desc="Live feed of every extracted lead with persistent WebSocket connection and automatic reconnection."
+              delay={0.3}
+            />
+            <FeatureCard
+              icon={<Cpu size={28} />}
+              title="AI Scoring Engine"
+              desc="Automatic Hot/Warm/Cold classification based on intent signals, engagement depth, and contact completeness."
+              delay={0.4}
+            />
+            <FeatureCard
+              icon={<BarChart3 size={28} />}
+              title="Fleet Analytics"
+              desc="Monitor performance across all WhatsApp sessions with real-time charts and instant export to Excel."
+              delay={0.5}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA ── */}
+      <section className="relative z-10 py-32 px-8">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="glass-card rounded-3xl p-16 relative overflow-hidden"
+            style={{ border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 0 80px rgba(124,58,237,0.15)' }}>
+            {/* Background glow */}
+            <div className="absolute inset-0 pointer-events-none"
+              style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(124,58,237,0.12) 0%, transparent 70%)' }} />
+            {/* Orbit ring */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full opacity-5 pointer-events-none animate-spin-slow"
+              style={{ border: '2px dashed #8b5cf6' }} />
+
+            <div className="relative z-10">
+              <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 animate-float"
+                style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)', boxShadow: '0 0 40px rgba(124,58,237,0.5)' }}>
+                <Zap size={36} className="text-white fill-white" />
+              </div>
+              <h2 className="text-5xl font-black tracking-tight text-white mb-5">
+                Ready to Scale?
+              </h2>
+              <p className="text-lg mb-10" style={{ color: '#a89fd4' }}>
+                Join 500+ businesses automating their WhatsApp lead generation with AI.
+              </p>
+              <a href="/dashboard"
+                className="btn-primary inline-flex px-12 py-5 rounded-2xl text-lg font-black items-center gap-3 group">
+                <Zap size={22} className="fill-white" />
+                Access the Console
+                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <footer className="relative z-10 py-12 border-t text-center"
+        style={{ borderColor: 'rgba(139,92,246,0.08)' }}>
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <div className="w-6 h-6 rounded-lg flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}>
+            <Zap size={12} className="text-white fill-white" />
+          </div>
+          <span className="text-xs font-black text-white">ChatLeads AI</span>
+        </div>
+        <p className="text-xs font-bold uppercase tracking-[0.3em]" style={{ color: '#3d3660' }}>
+          © 2026 • All Systems Operational • Dark Nexus v2.0
+        </p>
+      </footer>
     </div>
   );
 }

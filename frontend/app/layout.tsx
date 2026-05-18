@@ -1,11 +1,12 @@
 import './globals.css';
-import { Inter } from 'next/font/google';
+import { Inter, Outfit } from 'next/font/google';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' });
 
 export const metadata = {
-  title: 'ChatLeads AI | Intelligent Lead Platform',
-  description: 'Automated WhatsApp lead capture with a premium light-speed experience.',
+  title: 'ChatLeads AI | Dark Nexus Intelligence Platform',
+  description: 'Next-generation WhatsApp lead intelligence powered by AI. Capture, score, and convert leads in real-time.',
 };
 
 export default function RootLayout({
@@ -14,8 +15,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} bg-[#f9fafb] text-[#1e293b] antialiased selection:bg-indigo-100 selection:text-indigo-700`}>
+    <html lang="en" className={`${inter.variable} ${outfit.variable}`}>
+      <body className={`${inter.className} bg-[#050508] text-[#f1f0ff] antialiased`}>
         {children}
       </body>
     </html>

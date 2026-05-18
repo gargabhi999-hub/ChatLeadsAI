@@ -3,6 +3,9 @@ import json
 import base64
 import io
 import re
+import time
+import asyncio
+import random
 from typing import Optional, Dict, List
 from dotenv import load_dotenv
 import ollama
@@ -56,14 +59,68 @@ def get_system_prompt(text_content: str, context: Optional[str] = None) -> str:
 class ExtractorService:
     def __init__(self):
         self.provider = os.getenv("AI_PROVIDER", "gemini").lower()
-        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
-        self.client = None
-                
-        if self.gemini_api_key:
+        
+        # Load all potential Gemini keys
+        self.gemini_api_keys = []
+        
+        # 1. Check comma-separated GEMINI_API_KEY
+        main_key_env = os.getenv("GEMINI_API_KEY", "")
+        if main_key_env:
+            for k in re.split(r'[;,]', main_key_env):
+                k = k.strip()
+                if k and k not in self.gemini_api_keys:
+                    self.gemini_api_keys.append(k)
+        
+        # 2. Check individual sequential variables GEMINI_API_KEY_1, GEMINI_API_KEY_2, etc.
+        for i in range(1, 10):
+            k = os.getenv(f"GEMINI_API_KEY_{i}")
+            if k:
+                k = k.strip()
+                if k and k not in self.gemini_api_keys:
+                    self.gemini_api_keys.append(k)
+                    
+        self.gemini_api_key = self.gemini_api_keys[0] if self.gemini_api_keys else None
+        
+        # Initialize clients pool with cooldown tracking
+        self.gemini_clients = []
+        for idx, key in enumerate(self.gemini_api_keys):
             try:
-                self.gemini_client = genai.Client(api_key=self.gemini_api_key)
+                masked = key[:6] + "..." + key[-4:] if len(key) > 10 else "..."
+                client = genai.Client(api_key=key)
+                self.gemini_clients.append({
+                    "id": idx + 1,
+                    "key": key,
+                    "masked": masked,
+                    "client": client,
+                    "cooldown_until": 0.0
+                })
+                print(f"✅ Initialized Gemini client #{idx + 1} ({masked})")
             except Exception as e:
-                print(f"Failed to initialize Gemini: {e}")
+                print(f"❌ Failed to initialize Gemini client #{idx + 1}: {e}")
+                
+        # Backward compatibility for any direct references to gemini_client
+        self.gemini_client = self.gemini_clients[0]["client"] if self.gemini_clients else None
+        self.client = None
+
+    def _get_available_client(self) -> Optional[Dict]:
+        """Returns the first available client that is not on cooldown.
+        If all clients are on cooldown, returns the one whose cooldown expires earliest."""
+        now = time.time()
+        
+        # Look for a non-cooldown client
+        for c in self.gemini_clients:
+            if c["cooldown_until"] <= now:
+                return c
+                
+        # If all on cooldown, find the one with the minimum cooldown time
+        if self.gemini_clients:
+            c = min(self.gemini_clients, key=lambda x: x["cooldown_until"])
+            masked = c["masked"]
+            wait_time = max(0.0, c["cooldown_until"] - now)
+            print(f"⚠️ All Gemini API keys are on cooldown. Selecting Key #{c['id']} ({masked}) with earliest expiry. Need to wait ~{wait_time:.1f}s if hit again.")
+            return c
+            
+        return None
 
     def _parse_ai_json(self, content: str) -> Optional[Dict]:
         """Extracts and parses JSON from AI response with high tolerance."""
@@ -103,8 +160,8 @@ class ExtractorService:
         else:
             result = await self._extract_ollama(combined_text, context_str)
 
-        # Fallback 1: Gemini (Free)
-        if not result and self.gemini_api_key:
+        # Fallback 1: Gemini (Free) - Only if not already tried as primary provider
+        if not result and self.provider != "gemini" and self.gemini_api_key:
             print("🔄 Falling back to Gemini Vision (Free Tier)...")
             result = await self._extract_gemini(combined_text, context_str, image_bytes)
 
@@ -260,21 +317,88 @@ class ExtractorService:
 
 
     async def _extract_gemini(self, text: str, context: Optional[str] = None, image_bytes: Optional[bytes] = None) -> Dict:
-        try:
-            prompt = get_system_prompt(text, context)
-            contents = [prompt]
-            
-            if image_bytes:
-                contents.append(Image.open(io.BytesIO(image_bytes)))
-                print("🖼️ Gemini Vision: Analyzing image content...")
-
-            response = self.gemini_client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=contents
-            )
-            return self._parse_ai_json(response.text)
-        except Exception as e:
-            print(f"Gemini Error: {e}")
+        if not self.gemini_clients:
+            print("❌ No initialized Gemini API keys available.")
             return None
+
+        prompt = get_system_prompt(text, context)
+        contents = [prompt]
+        
+        if image_bytes:
+            try:
+                contents.append(Image.open(io.BytesIO(image_bytes)))
+            except Exception as e:
+                print(f"❌ Failed to parse image bytes for Gemini: {e}")
+
+        max_retries = 3
+        retry_delay = 3.0  # Base delay for exponential backoff
+        
+        for attempt in range(max_retries + 1):
+            client_info = self._get_available_client()
+            if not client_info:
+                print("❌ No Gemini client available.")
+                return None
+                
+            client_id = client_info["id"]
+            masked_key = client_info["masked"]
+            client = client_info["client"]
+            
+            # Check if client is still under cooldown (only possible if all keys are on cooldown)
+            now = time.time()
+            if client_info["cooldown_until"] > now:
+                wait_sec = client_info["cooldown_until"] - now
+                print(f"⏳ Sleeping for {wait_sec:.2f}s because all keys are rate-limited...")
+                await asyncio.sleep(wait_sec)
+            
+            try:
+                if image_bytes:
+                    print(f"🖼️ Gemini Vision: Analyzing image content using Key #{client_id} ({masked_key})...")
+                else:
+                    print(f"🤖 Gemini: Extracting data using Key #{client_id} ({masked_key})...")
+                
+                # Make the API call in run_in_executor to prevent blocking the event loop
+                loop = asyncio.get_running_loop()
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=contents
+                    )
+                )
+                
+                # Success! Clear cooldown for this key
+                client_info["cooldown_until"] = 0.0
+                return self._parse_ai_json(response.text)
+                
+            except Exception as e:
+                err_msg = str(e)
+                print(f"Gemini Error (Key #{client_id} / {masked_key}): {err_msg}")
+                
+                # Identify if it is a rate limit / 429 error
+                is_429 = "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg or "rate" in err_msg.lower() or "quota" in err_msg.lower()
+                
+                if is_429:
+                    # Place key on 60-second cooldown
+                    cooldown_duration = 60.0
+                    client_info["cooldown_until"] = time.time() + cooldown_duration
+                    print(f"⚠️ Key #{client_id} ({masked_key}) hit rate limits. Cooldown active for {cooldown_duration}s.")
+                    
+                    # If we have other keys that are not on cooldown, retry immediately with key rotation!
+                    active_keys = [c for c in self.gemini_clients if c["cooldown_until"] <= time.time()]
+                    if active_keys:
+                        print(f"🔄 Rotating to the next available key immediately (attempt {attempt + 1}/{max_retries + 1})...")
+                        continue
+                
+                # If it's the last attempt, don't sleep
+                if attempt == max_retries:
+                    print("❌ Max retries reached for Gemini. Failing extraction.")
+                    break
+                    
+                # Backoff delay calculation: base * 2^attempt + random jitter (0 to 1s)
+                current_delay = (retry_delay * (2 ** attempt)) + random.uniform(0.0, 1.0)
+                print(f"⏳ Sleeping for {current_delay:.2f}s (backoff retry {attempt + 1}/{max_retries})...")
+                await asyncio.sleep(current_delay)
+                
+        return None
 
 extractor = ExtractorService()
