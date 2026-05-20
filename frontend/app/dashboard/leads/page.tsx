@@ -78,9 +78,9 @@ export default function LeadsPage() {
 
   /* ── Modal wrapper ── */
   const Modal = ({ children }: { children: React.ReactNode }) => (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-fade-in"
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 overflow-y-auto animate-fade-in"
       style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)' }}>
-      <div className="w-full max-w-md animate-scale-in rounded-3xl p-10 space-y-6"
+      <div className="w-full sm:max-w-md animate-scale-in rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 sm:p-10 space-y-6 max-h-[85vh] sm:max-h-[calc(100vh-3rem)] overflow-y-auto custom-scrollbar"
         style={{ background: 'rgba(13,13,26,0.98)', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 40px 80px rgba(0,0,0,0.6), 0 0 60px rgba(124,58,237,0.15)' }}>
         {children}
       </div>
@@ -151,9 +151,9 @@ export default function LeadsPage() {
 
       {/* ── Export Modal ── */}
       {showExportModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 animate-fade-in"
+        <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-6 overflow-y-auto animate-fade-in"
           style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)' }}>
-          <div className="w-full max-w-lg animate-scale-in rounded-3xl p-10 space-y-6"
+          <div className="w-full sm:max-w-lg animate-scale-in rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 sm:p-10 space-y-6 max-h-[85vh] sm:max-h-[calc(100vh-3rem)] overflow-y-auto custom-scrollbar"
             style={{ background: 'rgba(13,13,26,0.98)', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 40px 80px rgba(0,0,0,0.6)' }}>
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto"
               style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)' }}>
