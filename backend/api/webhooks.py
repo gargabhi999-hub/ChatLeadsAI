@@ -58,8 +58,9 @@ async def process_lead_background(msg: WhatsAppMessage, image_bytes: Optional[by
             name = extracted.get('name', 'absent')
             mobile = extracted.get('mobile', 'absent')
             email = extracted.get('email', 'absent')
+            arn = extracted.get('arn', 'absent')
             
-            print(f"📊 Extracted from THIS message - Name: {name}, Mobile: {mobile}, Email: {email}")
+            print(f"📊 Extracted from THIS message - Name: {name}, Mobile: {mobile}, Email: {email}, ARN: {arn}")
             
             # 4. Validate and Sanitize extracted data
             # Rule 1: A valid lead MUST contain contact details (either mobile OR email).
@@ -138,6 +139,7 @@ async def process_lead_background(msg: WhatsAppMessage, image_bytes: Optional[by
                 "extracted_name": name if name != "absent" else None,
                 "mobile": mobile if mobile != "absent" else None,
                 "email": email if email != "absent" else None,
+                "arn": arn if arn != "absent" else None,
                 "company": extracted.get('company', None) if extracted.get('company') != 'absent' else None,
                 "confidence": extracted.get('confidence', 0.5),
                 "lead_score": extracted.get('lead_score', 'Cold'),
@@ -149,6 +151,7 @@ async def process_lead_background(msg: WhatsAppMessage, image_bytes: Optional[by
             print(f"   Name: {contact_data['extracted_name']}")
             print(f"   Mobile: {contact_data['mobile']}")
             print(f"   Email: {contact_data['email']}")
+            print(f"   ARN: {contact_data['arn']}")
             print(f"   Source: {contact_data['source_message'][:100]}...")
             print(f"   Sender: {msg.sender_name}")
             print(f"   Session: {msg.session_id}\n")
@@ -170,6 +173,7 @@ async def process_lead_background(msg: WhatsAppMessage, image_bytes: Optional[by
                         "name": contact_data['extracted_name'],
                         "mobile": contact_data['mobile'],
                         "email": contact_data['email'],
+                        "arn": contact_data['arn'],
                         "score": contact.lead_score,
                         "session": msg.session_id,
                         "action": "created",

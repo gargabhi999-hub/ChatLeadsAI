@@ -29,14 +29,21 @@ load_dotenv()
 def get_system_prompt(text_content: str, context: Optional[str] = None) -> str:
     context_str = f"\nRECENT CONTEXT (Previous messages from this contact):\n{context}" if context else ""
     return f"""
-        You are an Expert Lead Generation Agent. Your task is to analyze the provided input (Text or Image) to identify a potential lead.
+        You are an Expert Lead Generation Agent. Your task is to analyze the provided input (which can be a Text message, an attached Image, or BOTH together) to identify a potential lead.
         
         CRITICAL PIPELINE INSTRUCTIONS:
-        1. FIRST, analyze the input (Text or Image) to see if a contact (mobile phone number) or email (mail) is present.
+        1. FIRST, analyze the input (both the Text caption/message AND/OR the attached Image simultaneously) to see if a contact (mobile phone number) or email (mail) is present.
            - A contact is a phone number (e.g., 10-digit mobile number, or with country code).
            - An email is an email address (e.g., matching standard email pattern, gmail, company email).
-        2. IF AND ONLY IF at least one of these contact details (mobile or email) is present, proceed to find the name of the person (the lead) in the same input.
-        3. IF NEITHER a contact (mobile) NOR an email (mail) is present in the input, this is NOT a lead. You MUST immediately return "absent" for name, mobile, and email, and set confidence to 0.0.
+        2. IF AND ONLY IF at least one of these contact details (mobile or email) is present in either the text or the image, proceed to find the name of the person (the lead) and the Application Reference Number (ARN) if present.
+           - If a text caption and an image are sent together, synthesize them: extract the name, email, and mobile from the text, and extract the Application Reference Number (ARN) from the image (or vice versa), compiling them into a single, unified lead record.
+        3. IF NEITHER a contact (mobile) NOR an email (mail) is present in either the text or the image, this is NOT a lead. You MUST immediately return "absent" for name, mobile, email, and arn, and set confidence to 0.0.
+        
+        RULES FOR ARN EXTRACTION:
+        - Look for an Application Reference Number, Transaction Reference, Submission Reference, or similar sequence (referred to as "ARN" or "ARN number").
+        - The ARN is typically a long digit sequence (e.g., 12 to 20 digits, such as 987654321123456 or 98654321234567890).
+        - It can be located inside the attached image (like a screenshot showing a bank submission or receipt) or in the text.
+        - If found, extract the numeric/alphanumeric ARN. If not found, return "absent".
         
         RULES FOR NAME EXTRACTION:
         - The name MUST be a real person's name or a business owner's name.
@@ -48,7 +55,7 @@ def get_system_prompt(text_content: str, context: Optional[str] = None) -> str:
         - If no real, relevant person's name is present, but a contact/email is present, extract the contact/email but return "absent" for the name.
         
         STEP-BY-STEP PROCESS FOR IMAGES:
-        1. Read every single word and number visible in the image (especially if it's a business card).
+        1. Read every single word and number visible in the image (especially if it's a business card or bank receipt).
         2. Follow the CRITICAL PIPELINE INSTRUCTIONS above to determine if contact info exists first.
         3. Extract fields accordingly.
         
@@ -65,6 +72,7 @@ def get_system_prompt(text_content: str, context: Optional[str] = None) -> str:
         1. name: The extracted name of the real person or "absent".
         2. mobile: The extracted 10-digit number or "absent".
         3. email: The extracted email or "absent".
+        4. arn: The extracted Application Reference Number (ARN) or "absent".
         
         CRITICAL RULES:
         - If you see a business card, the "name" should be the person's name on the card.
@@ -76,10 +84,12 @@ def get_system_prompt(text_content: str, context: Optional[str] = None) -> str:
             "name": "string or \"absent\"",
             "mobile": "string or \"absent\"",
             "email": "string or \"absent\"",
+            "arn": "string or \"absent\"",
             "lead_score": "Hot/Warm/Cold",
             "confidence": 0.0 to 1.0
         }}
     """
+
 
 
 class ExtractorService:
@@ -218,6 +228,16 @@ class ExtractorService:
                 result['name'] = result.get('name', 'absent')
                 result['mobile'] = result.get('mobile', 'absent')
                 result['email'] = result.get('email', 'absent')
+                result['arn'] = result.get('arn', 'absent')
+                
+                # Sanitize ARN
+                if result['arn'] != 'absent' and result['arn']:
+                    clean_arn = re.sub(r'[\s\-:#]', '', str(result['arn']))
+                    if clean_arn.isalnum() and len(clean_arn) >= 8:
+                        result['arn'] = clean_arn
+                    else:
+                        result['arn'] = 'absent'
+
                 
                 # Validate and clean mobile number
                 if result['mobile'] != 'absent':
@@ -261,6 +281,10 @@ class ExtractorService:
                 r'(?:I am|My name is|Name:?|This is)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
                 r'(?:Hi|Hello|Hey),?\s+(?:this is\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
                 r'^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)$'
+            ],
+            'arn': [
+                r'(?:arn|arn\s+no|reference\s+number|application\s+reference|ref\s+no)[\s.:#\-]*(\d{10,20})',
+                r'\b\d{12,20}\b'
             ]
         }
         
@@ -288,15 +312,28 @@ class ExtractorService:
                 email = matches[0].lower()
                 break
 
+        # Extract ARN
+        arn = "absent"
+        for pattern in patterns['arn']:
+            matches = re.findall(pattern, clean_text, re.IGNORECASE)
+            if matches:
+                m = matches[0]
+                digits = re.sub(r'\D', '', m)
+                if len(digits) >= 8:
+                    arn = digits
+                    break
+
         # NEW RULE: If neither mobile nor email are present, immediately reject as not a valid lead!
         if mobile == "absent" and email == "absent":
             return {
                 "name": "absent",
                 "mobile": "absent",
                 "email": "absent",
+                "arn": "absent",
                 "lead_score": "Cold",
                 "confidence": 0.0
             }
+
         
         # List of common words/phrases that are NOT names (Blacklist)
         blacklist = [
@@ -379,6 +416,7 @@ class ExtractorService:
             "name": name,
             "mobile": mobile,
             "email": email,
+            "arn": arn,
             "lead_score": lead_score,
             "confidence": confidence
         }

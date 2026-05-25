@@ -36,3 +36,5 @@ class Contact(SQLModel, table=True):
     source_type: str = "whatsapp" # whatsapp, image, etc.
     created_at: datetime = Field(default_factory=datetime.utcnow)
     lead_score: Optional[str] = None  # Hot, Warm, Cold
+    arn: Optional[str] = Field(default=None)
+

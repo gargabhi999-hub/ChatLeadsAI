@@ -14,6 +14,7 @@ interface Lead {
   extracted_name: string;
   mobile: string;
   email: string;
+  arn?: string | null;
   company: string;
   lead_score: string;
   confidence: number;
@@ -596,6 +597,17 @@ function LeadCard({ lead, index, isSuperAdmin, onDelete }: {
                 {lead.mobile || 'Unknown Frequency'}
               </span>
             </div>
+            {lead.arn && (
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-6 h-6 md:w-8 md:h-8 rounded-md md:rounded-lg flex items-center justify-center shrink-0"
+                  style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
+                  <Hash size={12} className="md:w-3.5 md:h-3.5" />
+                </div>
+                <span className="text-xs md:text-sm font-black truncate" style={{ color: 'var(--purple-mid)' }}>
+                  ARN: {lead.arn}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Confidence ring + delete */}
