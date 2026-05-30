@@ -987,91 +987,53 @@ export default function LeadsDashboard() {
                   </div>
                 </div>
 
-                {/* Dropoff Reasons Bar Chart */}
+                {/* Agents & Events Overview Card */}
                 <div className="glass-card rounded-3xl p-6 md:p-8 flex flex-col justify-between shadow-md">
                   <div>
-                    <h3 className="text-lg md:text-xl font-black text-[var(--text-primary)]">Conversion Dropoffs</h3>
-                    <p className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mt-1">Core friction points and reasons</p>
+                    <h3 className="text-lg md:text-xl font-black text-[var(--text-primary)]">Agents & Events Overview</h3>
+                    <p className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mt-1">Active agents and sessions overview</p>
                   </div>
 
-                  <div className="my-6 space-y-4">
-                    {dropoffChartData.length === 0 ? (
-                      <div className="text-center py-10">
-                        <CheckCircle size={28} className="text-emerald-500 mx-auto mb-2" />
-                        <p className="italic text-xs font-bold" style={{ color: 'var(--text-muted)' }}>No Conversion Dropoffs detected!</p>
-                      </div>
-                    ) : (
-                      dropoffChartData.map((drop, i) => {
-                        const maxVal = Math.max(...dropoffChartData.map(d => d.value));
-                        const percent = maxVal > 0 ? (drop.value / maxVal) * 100 : 0;
-                        return (
-                          <div key={drop.name} className="space-y-1">
-                            <div className="flex justify-between text-xs font-bold">
-                              <span style={{ color: 'var(--text-secondary)' }} className="truncate max-w-[280px]">{drop.name}</span>
-                              <span className="font-black text-amber-500">{drop.value}</span>
+                  <div className="my-6 grid grid-cols-2 gap-4">
+                    
+                    {/* Active Agents list */}
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1">
+                        <User size={10} className="text-indigo-400" /> Active Agents
+                      </p>
+                      {activeAgents.length === 0 ? (
+                        <p className="text-[10px] italic text-[var(--text-ghost)] font-bold">No agents mapped</p>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {activeAgents.map((ag) => (
+                            <div key={ag.name} className="flex justify-between items-center text-[10px] font-bold p-2 rounded-xl bg-[var(--bg-hover)] border border-[var(--border-subtle)]">
+                              <span className="text-[var(--text-secondary)] truncate max-w-[90px]">{ag.name}</span>
+                              <span className="px-1.5 py-0.5 rounded-md text-[8px] font-black bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">{ag.count} leads</span>
                             </div>
-                            <div className="w-full h-3 rounded-full overflow-hidden" style={{ background: 'rgba(37,99,235,0.06)' }}>
-                              <motion.div
-                                initial={{ width: 0 }}
-                                animate={{ width: `${percent}%` }}
-                                transition={{ duration: 0.8, ease: "easeOut" }}
-                                className="h-full rounded-full"
-                                style={{ background: 'linear-gradient(90deg, #f59e0b, #eab308)' }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {/* Dotted separator line */}
-                  <div className="border-t border-dashed my-4" style={{ borderColor: 'var(--border-subtle)' }} />
-
-                  {/* Section 2: Agents and Events Names breakdown */}
-                  <div className="space-y-4">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-[var(--text-primary)]">Agents & Events Overview</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      
-                      {/* Active Agents list */}
-                      <div className="space-y-2">
-                        <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1">
-                          <User size={10} className="text-indigo-400" /> Active Agents
-                        </p>
-                        {activeAgents.length === 0 ? (
-                          <p className="text-[10px] italic text-[var(--text-ghost)] font-bold">No agents mapped</p>
-                        ) : (
-                          <div className="space-y-1.5">
-                            {activeAgents.map((ag) => (
-                              <div key={ag.name} className="flex justify-between items-center text-[10px] font-bold p-2 rounded-xl bg-[var(--bg-hover)] border border-[var(--border-subtle)]">
-                                <span className="text-[var(--text-secondary)] truncate max-w-[90px]">{ag.name}</span>
-                                <span className="px-1.5 py-0.5 rounded-md text-[8px] font-black bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">{ag.count} leads</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Active Events list */}
-                      <div className="space-y-2">
-                        <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1">
-                          <Activity size={10} className="text-emerald-400" /> Active Events
-                        </p>
-                        {activeEvents.length === 0 ? (
-                          <p className="text-[10px] italic text-[var(--text-ghost)] font-bold">No events recorded</p>
-                        ) : (
-                          <div className="space-y-1.5">
-                            {activeEvents.map((ev) => (
-                              <div key={ev.name} className="flex justify-between items-center text-[10px] font-bold p-2 rounded-xl bg-[var(--bg-hover)] border border-[var(--border-subtle)]">
-                                <span className="text-[var(--text-secondary)] truncate max-w-[90px]">{ev.name}</span>
-                                <span className="px-1.5 py-0.5 rounded-md text-[8px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{ev.count} leads</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
+                          ))}
+                        </div>
+                      )}
                     </div>
+
+                    {/* Active Events list */}
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1">
+                        <Activity size={10} className="text-emerald-400" /> Active Events
+                      </p>
+                      {activeEvents.length === 0 ? (
+                        <p className="text-[10px] italic text-[var(--text-ghost)] font-bold">No events recorded</p>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {activeEvents.map((ev) => (
+                            <div key={ev.name} className="flex justify-between items-center text-[10px] font-bold p-2 rounded-xl bg-[var(--bg-hover)] border border-[var(--border-subtle)]">
+                              <span className="text-[var(--text-secondary)] truncate max-w-[90px]">{ev.name}</span>
+                              <span className="px-1.5 py-0.5 rounded-md text-[8px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{ev.count} leads</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                   </div>
                 </div>
 
