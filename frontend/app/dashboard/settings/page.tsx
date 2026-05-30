@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Cpu, Database, User, Bell, Globe, Save,
-  CheckCircle2, Zap, Shield, Activity, X
+  CheckCircle2, Zap, Shield, Activity, X,
+  Users, Plus, Trash2, MapPin, Building2
 } from 'lucide-react';
 
 function SettingsTab({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void }) {
@@ -84,6 +85,7 @@ function SectionCard({ icon, title, subtitle, children }: { icon: React.ReactNod
 const TABS = [
   { id: 'ai', label: 'AI Engine', icon: <Cpu size={16} className="md:w-[18px] md:h-[18px]" /> },
   { id: 'database', label: 'Database', icon: <Database size={16} className="md:w-[18px] md:h-[18px]" /> },
+  { id: 'agents', label: 'Location Agents', icon: <Users size={16} className="md:w-[18px] md:h-[18px]" /> },
   { id: 'notifications', label: 'Notifications', icon: <Bell size={16} className="md:w-[18px] md:h-[18px]" /> },
   { id: 'api', label: 'API & Webhooks', icon: <Globe size={16} className="md:w-[18px] md:h-[18px]" /> },
   { id: 'account', label: 'Account', icon: <User size={16} className="md:w-[18px] md:h-[18px]" /> },
@@ -94,6 +96,108 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState('gemini');
+
+  // Agents & Locations management states
+  const [agents, setAgents] = useState<any[]>([]);
+  const [loadingAgents, setLoadingAgents] = useState(true);
+  const [lgCode, setLgCode] = useState('');
+  const [execName, setExecName] = useState('');
+  const [execCode, setExecCode] = useState('');
+  const [city, setCity] = useState('');
+  const [place, setPlace] = useState('');
+  const [venue, setVenue] = useState('');
+  const [agentError, setAgentError] = useState('');
+  const [agentSuccess, setAgentSuccess] = useState('');
+
+  const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const apiUrl = rawApiUrl.replace(/\/$/, '');
+
+  const fetchAgents = async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const headers: HeadersInit = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${apiUrl}/agents/`, { headers });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setAgents(data);
+    } catch (e) {
+      console.error("Failed to fetch agents", e);
+    } finally {
+      setLoadingAgents(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAgents();
+  }, []);
+
+  const handleAddAgent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAgentError('');
+    setAgentSuccess('');
+
+    if (!lgCode || !execName || !execCode || !city || !place || !venue) {
+      setAgentError('Please fill all fields.');
+      return;
+    }
+
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${apiUrl}/agents/`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          lg_code: lgCode,
+          executive_name: execName,
+          executive_code: execCode,
+          city,
+          place,
+          venue
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.detail || 'Failed to add agent');
+      }
+
+      setAgentSuccess('Agent added successfully!');
+      setLgCode('');
+      setExecName('');
+      setExecCode('');
+      setCity('');
+      setPlace('');
+      setVenue('');
+      fetchAgents();
+    } catch (err: any) {
+      setAgentError(err.message || 'Error occurred');
+    }
+  };
+
+  const handleDeleteAgent = async (id: number) => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const headers: HeadersInit = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${apiUrl}/agents/${id}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      if (!res.ok) throw new Error();
+      fetchAgents();
+    } catch (e) {
+      console.error("Failed to delete agent", e);
+    }
+  };
 
   const handleSave = () => {
     setSaving(true);
@@ -246,6 +350,151 @@ export default function SettingsPage() {
                       </div>
                     </div>
                   </div>
+                </SectionCard>
+              </motion.div>
+            )}
+
+            {activeTab === 'agents' && (
+              <motion.div key="agents" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                <SectionCard icon={<Users size={20} className="md:w-[22px] md:h-[22px]" />} title="Location Agents & Staff" subtitle="Manage multiple agents and locations linked by LG codes">
+                  
+                  {/* Form to Add New Agent */}
+                  <form onSubmit={handleAddAgent} className="p-5 rounded-2xl border space-y-4 shadow-sm" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border-subtle)' }}>
+                    <p className="text-xs font-black uppercase tracking-widest text-[var(--purple-mid)]">Add New Location Agent</p>
+                    
+                    {agentError && (
+                      <div className="p-3.5 rounded-xl text-xs font-black uppercase tracking-wider bg-red-500/10 text-red-500 border border-red-500/20">
+                        {agentError}
+                      </div>
+                    )}
+                    {agentSuccess && (
+                      <div className="p-3.5 rounded-xl text-xs font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                        {agentSuccess}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">LG Code</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. FIDR30" 
+                          value={lgCode}
+                          onChange={e => setLgCode(e.target.value)}
+                          className="input-dark w-full px-3 py-2 rounded-lg font-bold text-xs" 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Executive Name</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. Samiksha" 
+                          value={execName}
+                          onChange={e => setExecName(e.target.value)}
+                          className="input-dark w-full px-3 py-2 rounded-lg font-bold text-xs" 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Executive Code</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. FIDR30" 
+                          value={execCode}
+                          onChange={e => setExecCode(e.target.value)}
+                          className="input-dark w-full px-3 py-2 rounded-lg font-bold text-xs" 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">City</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. Delhi (or Bangalore)" 
+                          value={city}
+                          onChange={e => setCity(e.target.value)}
+                          className="input-dark w-full px-3 py-2 rounded-lg font-bold text-xs" 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Place / Area</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. Vegas Dwarka (or White Field)" 
+                          value={place}
+                          onChange={e => setPlace(e.target.value)}
+                          className="input-dark w-full px-3 py-2 rounded-lg font-bold text-xs" 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Venue</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. Croma (or Croma Store)" 
+                          value={venue}
+                          onChange={e => setVenue(e.target.value)}
+                          className="input-dark w-full px-3 py-2 rounded-lg font-bold text-xs" 
+                        />
+                      </div>
+                    </div>
+
+                    <button type="submit" className="w-full flex items-center justify-center gap-2 px-4 py-2.5 btn-primary rounded-xl font-black text-xs uppercase tracking-widest transition-all cursor-pointer">
+                      <Plus size={14} /> Add Location Agent
+                    </button>
+                  </form>
+
+                  {/* List of Registered Agents */}
+                  <div className="space-y-3 pt-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Registered Agents ({agents.length})</p>
+                    
+                    {loadingAgents ? (
+                      <p className="text-xs italic text-[var(--text-ghost)]">Loading agents...</p>
+                    ) : agents.length === 0 ? (
+                      <div className="p-6 text-center border border-dashed rounded-2xl" style={{ borderColor: 'var(--border-subtle)' }}>
+                        <Users size={24} className="mx-auto text-[var(--text-ghost)] mb-2" />
+                        <p className="text-xs font-bold text-[var(--text-ghost)] uppercase tracking-wider">No agents added yet.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto custom-scrollbar pr-1">
+                        {agents.map((agent: any) => (
+                          <div key={agent.id} className="p-4 rounded-xl border flex flex-col justify-between hover:border-[var(--purple-mid)] transition-all" style={{ background: 'var(--bg-hover)', borderColor: 'var(--border-subtle)' }}>
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-start">
+                                <span className="text-[10px] font-black text-[var(--purple-mid)] uppercase tracking-widest bg-[var(--bg-deep)] px-2.5 py-0.5 rounded border border-glow">
+                                  LG: {agent.lg_code}
+                                </span>
+                                <button 
+                                  type="button"
+                                  onClick={() => handleDeleteAgent(agent.id)}
+                                  className="text-red-500 hover:text-red-700 transition-colors p-1 cursor-pointer"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+
+                              <div>
+                                <p className="text-xs font-black text-[var(--text-primary)]">{agent.executive_name}</p>
+                                <p className="text-[9px] font-bold text-[var(--text-muted)] mt-0.5 uppercase tracking-wider">Code: {agent.executive_code}</p>
+                              </div>
+
+                              <div className="grid grid-cols-3 gap-1 bg-[var(--bg-deep)] p-2 rounded-lg text-[9px] font-bold text-[var(--text-secondary)] border border-subtle">
+                                <div className="min-w-0">
+                                  <p className="text-[8px] font-black uppercase text-[var(--text-muted)]">City</p>
+                                  <p className="text-[var(--text-primary)] truncate">{agent.city}</p>
+                                </div>
+                                <div className="min-w-0 col-span-2 border-l pl-2" style={{ borderColor: 'var(--border-subtle)' }}>
+                                  <p className="text-[8px] font-black uppercase text-[var(--text-muted)]">Venue</p>
+                                  <p className="text-[var(--text-primary)] truncate">{agent.place} ({agent.venue})</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                 </SectionCard>
               </motion.div>
             )}

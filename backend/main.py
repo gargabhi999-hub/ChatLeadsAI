@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Import routers
-from api import webhooks, contacts, sessions, stats, auth, users
+from api import webhooks, contacts, sessions, stats, auth, users, agents
 from core.ws import manager
 from models import User
 from database import get_session
@@ -165,6 +165,7 @@ app.include_router(webhooks.router)
 app.include_router(contacts.router)
 app.include_router(sessions.router)
 app.include_router(stats.router)
+app.include_router(agents.router)
 
 # Static files
 app.mount("/static", StaticFiles(directory="static", html=True), name="static")

@@ -53,6 +53,13 @@ interface Lead {
   remarks?: string | null;
   excel_updated?: boolean;
   excel_updated_at?: string | null;
+
+  // Location & Agent Details
+  executive_name?: string | null;
+  executive_code?: string | null;
+  agent_city?: string | null;
+  agent_place?: string | null;
+  agent_venue?: string | null;
 }
 
 interface SessionInfo {
@@ -687,20 +694,42 @@ export default function LeadsPage() {
                   {/* Unmatched list if any */}
                   {uploadResult.unmatched_arns?.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-amber-500">Unmatched ARNs List (First 100)</p>
-                      <div className="max-h-32 overflow-y-auto p-3 rounded-xl space-y-1.5 custom-scrollbar border"
+                      <div className="flex justify-between items-center">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-amber-500">
+                          Unmatched ARNs List ({uploadResult.unmatched_count})
+                        </p>
+                        <span className="text-[8px] font-bold text-[var(--text-ghost)] uppercase tracking-wider">
+                          Scroll to view all
+                        </span>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto p-3 rounded-xl space-y-2 custom-scrollbar border"
                         style={{ background: 'var(--bg-deep)', borderColor: 'var(--border-subtle)' }}>
-                        {uploadResult.unmatched_arns.map((arn: string, idx: number) => (
-                          <div key={idx} className="flex justify-between items-center text-xs font-bold p-1 hover:bg-opacity-50 hover:bg-[var(--bg-hover)] rounded-md">
-                            <span style={{ color: 'var(--text-secondary)' }}>{arn}</span>
-                            <button 
-                              onClick={() => copyToClipboard(arn, `arn-${idx}`)}
-                              className="text-[9px] font-black uppercase tracking-widest text-[var(--purple-mid)] hover:underline flex items-center gap-1">
-                              {copiedArns[`arn-${idx}`] ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
-                              {copiedArns[`arn-${idx}`] ? 'Copied' : 'Copy'}
-                            </button>
-                          </div>
-                        ))}
+                        {uploadResult.unmatched_arns.map((item: any, idx: number) => {
+                          const arnStr = typeof item === 'object' && item !== null ? item.arn : String(item);
+                          const reasonStr = typeof item === 'object' && item !== null ? item.reason : 'Not found in database';
+                          const isAuthRestricted = reasonStr.includes('another company');
+                          
+                          return (
+                            <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between text-xs font-bold p-2 hover:bg-opacity-50 hover:bg-[var(--bg-hover)] rounded-lg border border-transparent hover:border-glow transition-all gap-2">
+                              <div className="space-y-0.5 min-w-0">
+                                <span className="font-mono text-[var(--text-primary)] tracking-wide select-all block truncate">{arnStr}</span>
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider w-fit block ${
+                                  isAuthRestricted 
+                                    ? 'bg-red-500/10 text-red-500 border border-red-500/20' 
+                                    : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                                }`}>
+                                  {reasonStr}
+                                </span>
+                              </div>
+                              <button 
+                                onClick={() => copyToClipboard(arnStr, `arn-${idx}`)}
+                                className="text-[9px] font-black uppercase tracking-widest text-[var(--purple-mid)] hover:underline flex items-center gap-1 self-end sm:self-center shrink-0">
+                                {copiedArns[`arn-${idx}`] ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
+                                {copiedArns[`arn-${idx}`] ? 'Copied' : 'Copy'}
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1153,7 +1182,7 @@ function LeadCard({ lead, index, isSuperAdmin, onDelete, onEdit }: {
                   exit={{ height: 0, opacity: 0 }}
                   className="overflow-hidden mt-3"
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs p-4 rounded-2xl"
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs p-4 rounded-2xl"
                     style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-subtle)' }}>
                     
                     {/* Verification Log */}
@@ -1194,9 +1223,17 @@ function LeadCard({ lead, index, isSuperAdmin, onDelete, onEdit }: {
                       ) : 'N/A'}</p>
                     </div>
 
+                    {/* Location & Agent Details */}
+                    <div className="space-y-1.5">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-blue-500">Location & Agent Details</p>
+                      <p className="font-bold text-[var(--text-secondary)]">Executive: <span className="font-black text-[var(--text-primary)]">{lead.executive_name || 'N/A'}</span></p>
+                      <p className="font-bold text-[var(--text-secondary)]">Exec Code: <span className="font-black text-[var(--text-primary)]">{lead.executive_code || 'N/A'}</span></p>
+                      <p className="font-bold text-[var(--text-secondary)] truncate">Venue / Retail: <span className="font-black text-[var(--purple-mid)]">{lead.agent_venue ? `${lead.agent_city} - ${lead.agent_place} - ${lead.agent_venue}` : 'N/A'}</span></p>
+                    </div>
+
                     {/* Remarks/Dropoff */}
                     {(lead.remarks || lead.dropoff_reason || lead.customer_type) && (
-                      <div className="sm:col-span-2 lg:col-span-4 mt-1.5 pt-2 border-t space-y-1" style={{ borderColor: 'var(--border-subtle)' }}>
+                      <div className="sm:col-span-2 lg:col-span-5 mt-1.5 pt-2 border-t space-y-1" style={{ borderColor: 'var(--border-subtle)' }}>
                         {lead.customer_type && <p className="font-bold text-[var(--text-secondary)]">Customer Type: <span className="font-black text-[var(--text-primary)]">{lead.customer_type}</span></p>}
                         {lead.dropoff_reason && <p className="font-bold text-[var(--text-secondary)]">Dropoff Reason: <span className="font-black text-[var(--text-primary)]">{lead.dropoff_reason}</span></p>}
                         {lead.remarks && <p className="font-bold text-[var(--text-secondary)]">Remarks: <span className="font-medium text-[var(--text-primary)] italic">"{lead.remarks}"</span></p>}

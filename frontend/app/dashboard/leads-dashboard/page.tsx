@@ -7,7 +7,7 @@ import {
   TrendingUp, Search, Filter, ClipboardList, MapPin, CreditCard,
   User, ChevronDown, ChevronUp, Clock, Info, Check, Copy, ExternalLink,
   Calendar, Building2, Phone, Mail, Sparkles, Server, ArrowLeft,
-  Activity, Zap, Hash
+  Activity, Zap, Hash, Edit
 } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 
@@ -54,6 +54,13 @@ interface Lead {
   remarks?: string | null;
   excel_updated?: boolean;
   excel_updated_at?: string | null;
+
+  // Location & Agent Details
+  executive_name?: string | null;
+  executive_code?: string | null;
+  agent_city?: string | null;
+  agent_place?: string | null;
+  agent_venue?: string | null;
 }
 
 export default function LeadsDashboard() {
@@ -76,6 +83,53 @@ export default function LeadsDashboard() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [role, setRole] = useState('user');
+
+  // Edit Outcome Parameters states
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<Lead>>({});
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const handleStartEdit = () => {
+    if (selectedLead) {
+      setEditForm({ ...selectedLead });
+      setIsEditing(true);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditForm({});
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedLead) return;
+    setSavingEdit(true);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${apiUrl}/contacts/${selectedLead.id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(editForm)
+      });
+
+      if (!res.ok) throw new Error();
+      const updatedLead = await res.json();
+      
+      // Update local leads list state
+      setLeads(prev => prev.map(l => l.id === updatedLead.id ? updatedLead : l));
+      setSelectedLead(updatedLead);
+      setIsEditing(false);
+    } catch (e) {
+      console.error("Failed to save lead updates", e);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
   
   // Selected Lead Drawer
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -226,22 +280,45 @@ export default function LeadsDashboard() {
     .slice(0, 4)
     .map(([name, value]) => ({ name, value }));
 
-  // 5. Timeline Trend (Last 7 unique dates)
-  const timelineGroups = filteredLeads.reduce((acc: {[key: string]: number}, l) => {
-    const dateStr = l.excel_updated_at 
-      ? new Date(l.excel_updated_at).toLocaleDateString([], { month: 'short', day: 'numeric' })
-      : l.created_at
-      ? new Date(l.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })
-      : 'N/A';
-    if (dateStr !== 'N/A') {
-      acc[dateStr] = (acc[dateStr] || 0) + 1;
+  // 5. Remarks Breakdown (Card Status Pie/Donut Chart)
+  const remarksGroups = filteredLeads.reduce((acc: {[key: string]: number}, l) => {
+    const key = l.remarks || 'No Remarks';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const remarksChartData = Object.entries(remarksGroups)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, value]) => ({ name, value }));
+
+  // 6. Mapped Agents Summary (Split Dropoffs panel)
+  const agentGroups = filteredLeads.reduce((acc: {[key: string]: number}, l) => {
+    if (l.executive_name) {
+      const key = `${l.executive_name} (${l.executive_code || 'N/A'})`;
+      acc[key] = (acc[key] || 0) + 1;
     }
     return acc;
   }, {});
-  const timelineChartData = Object.entries(timelineGroups)
-    .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
-    .slice(-7)
-    .map(([date, count]) => ({ date, count }));
+  const activeAgents = Object.entries(agentGroups)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([name, count]) => ({ name, count }));
+
+  // 7. Active Events/Sessions Summary (Split Dropoffs panel)
+  const eventGroups = filteredLeads.reduce((acc: {[key: string]: number}, l) => {
+    if (l.session_id) {
+      const cleanEvent = l.session_id.replace(/_/g, ' ')
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      acc[cleanEvent] = (acc[cleanEvent] || 0) + 1;
+    }
+    return acc;
+  }, {});
+  const activeEvents = Object.entries(eventGroups)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([name, count]) => ({ name, count }));
 
   // Colors for Donut Slices
   const sliceColors = ['#2563eb', '#10b981', '#f59e0b', '#dc2626', '#8b5cf6', '#6b7280'];
@@ -619,9 +696,9 @@ export default function LeadsDashboard() {
                         return decisionChartData.map((d, i) => {
                           const percent = (d.value / totalCount) * 100;
                           const dashArray = 2 * Math.PI * 65; 
-                          const dashOffset = dashArray - (dashArray * percent) / 100;
+                          const segmentLength = (dashArray * percent) / 100;
                           const strokeOffset = currentOffset;
-                          currentOffset += (dashArray * percent) / 100;
+                          currentOffset += segmentLength;
 
                           return (
                             <motion.circle
@@ -630,11 +707,11 @@ export default function LeadsDashboard() {
                               fill="transparent"
                               stroke={sliceColors[i % sliceColors.length]}
                               strokeWidth="16"
-                              strokeDasharray={`${dashArray} ${dashArray}`}
-                              strokeDashoffset={dashOffset - strokeOffset}
+                              strokeDasharray={`${segmentLength} ${dashArray - segmentLength}`}
+                              strokeDashoffset={-strokeOffset}
                               strokeLinecap="round"
-                              initial={{ strokeDashoffset: dashArray }}
-                              animate={{ strokeDashoffset: dashOffset - strokeOffset }}
+                              initial={{ strokeDasharray: `0 ${dashArray}` }}
+                              animate={{ strokeDasharray: `${segmentLength} ${dashArray - segmentLength}` }}
                               transition={{ duration: 0.8, ease: "easeOut" }}
                               className="cursor-pointer hover:stroke-[20px] transition-all"
                             />
@@ -706,95 +783,68 @@ export default function LeadsDashboard() {
                   </div>
                 </div>
 
-                {/* Line/Area Graph: Timeline Trend */}
+                {/* Donut Chart: Card Status (Remarks Breakdown) */}
                 <div className="glass-card rounded-3xl p-6 md:p-8 flex flex-col justify-between shadow-md">
                   <div>
-                    <h3 className="text-lg md:text-xl font-black text-[var(--text-primary)]">Matching Timeline</h3>
-                    <p className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mt-1">Matched leads count trend</p>
+                    <h3 className="text-lg md:text-xl font-black text-[var(--text-primary)]">Card Status</h3>
+                    <p className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mt-1">Lead remarks breakdown</p>
                   </div>
-
-                  {/* SVG Line Graph */}
-                  <div className="my-6 h-40 w-full relative flex items-end">
-                    {timelineChartData.length === 0 ? (
-                      <p className="text-center italic text-xs font-bold w-full" style={{ color: 'var(--text-ghost)' }}>Awaiting dates...</p>
-                    ) : (
-                      <svg className="w-full h-full" viewBox="0 0 300 120" preserveAspectRatio="none">
-                        {(() => {
-                          const maxCount = Math.max(...timelineChartData.map(d => d.count), 1);
-                          const widthPerSegment = 300 / (timelineChartData.length - 1 || 1);
-                          
-                          const coords = timelineChartData.map((d, i) => {
-                            const x = i * widthPerSegment;
-                            const y = 110 - (d.count / maxCount) * 80;
-                            return { x, y };
-                          });
-
-                          const pathD = coords.reduce((acc, c, i) => 
-                            i === 0 ? `M ${c.x} ${c.y}` : `${acc} L ${c.x} ${c.y}`, ""
-                          );
-
-                          const fillD = `${pathD} L 300 120 L 0 120 Z`;
+                  
+                  {/* Custom SVG Donut Chart */}
+                  <div className="my-6 flex items-center justify-center relative">
+                    <svg className="w-48 h-48 -rotate-90">
+                      {(() => {
+                        let currentOffset = 0;
+                        return remarksChartData.map((d, i) => {
+                          const percent = (d.value / totalCount) * 100;
+                          const dashArray = 2 * Math.PI * 65; 
+                          const segmentLength = (dashArray * percent) / 100;
+                          const strokeOffset = currentOffset;
+                          currentOffset += segmentLength;
 
                           return (
-                            <>
-                              <line x1="0" y1="30" x2="300" y2="30" stroke="var(--border-subtle)" strokeWidth="0.5" strokeDasharray="3 3" />
-                              <line x1="0" y1="70" x2="300" y2="70" stroke="var(--border-subtle)" strokeWidth="0.5" strokeDasharray="3 3" />
-                              <line x1="0" y1="110" x2="300" y2="110" stroke="var(--border-subtle)" strokeWidth="0.5" />
-
-                              <path d={fillD} fill="url(#areaGlow)" opacity="0.15" />
-
-                              <motion.path
-                                d={pathD}
-                                fill="none"
-                                stroke="var(--purple-mid)"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                initial={{ pathLength: 0 }}
-                                animate={{ pathLength: 1 }}
-                                transition={{ duration: 1.0, ease: "easeOut" }}
-                              />
-
-                              {coords.map((c, i) => (
-                                <circle
-                                  key={i}
-                                  cx={c.x} cy={c.y} r="3"
-                                  fill="#ffffff"
-                                  stroke="var(--purple-mid)"
-                                  strokeWidth="1.5"
-                                  className="cursor-pointer hover:r-5 transition-all"
-                                />
-                              ))}
-
-                              <defs>
-                                <linearGradient id="areaGlow" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="var(--purple-mid)" />
-                                  <stop offset="100%" stopColor="var(--purple-mid)" stopOpacity="0" />
-                                </linearGradient>
-                              </defs>
-                            </>
+                            <motion.circle
+                              key={d.name}
+                              cx="50%" cy="50%" r="65"
+                              fill="transparent"
+                              stroke={sliceColors[(i + 3) % sliceColors.length]}
+                              strokeWidth="16"
+                              strokeDasharray={`${segmentLength} ${dashArray - segmentLength}`}
+                              strokeDashoffset={-strokeOffset}
+                              strokeLinecap="round"
+                              initial={{ strokeDasharray: `0 ${dashArray}` }}
+                              animate={{ strokeDasharray: `${segmentLength} ${dashArray - segmentLength}` }}
+                              transition={{ duration: 0.8, ease: "easeOut" }}
+                              className="cursor-pointer hover:stroke-[20px] transition-all"
+                            />
                           );
-                        })()}
-                      </svg>
-                    )}
+                        });
+                      })()}
+                    </svg>
+                    <div className="absolute flex flex-col items-center justify-center">
+                      <span className="text-2xl font-black text-[var(--text-primary)]">{totalCount}</span>
+                      <span className="text-[8px] font-black uppercase tracking-wider text-[var(--text-muted)]">Filtered</span>
+                    </div>
                   </div>
 
-                  {/* Horizontal Dates list */}
-                  <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-wider border-t pt-3"
-                    style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }}>
-                    {timelineChartData.length === 0 ? (
-                      <span className="w-full text-center">N/A</span>
+                  {/* Legends */}
+                  <div className="space-y-1.5 pt-2">
+                    {remarksChartData.length === 0 ? (
+                      <p className="text-center italic text-xs font-bold py-4" style={{ color: 'var(--text-ghost)' }}>No remarks data</p>
                     ) : (
-                      timelineChartData.map((d, i) => (
-                        <span key={i} className="truncate max-w-[40px] text-center">{d.date}</span>
+                      remarksChartData.map((d, i) => (
+                        <div key={d.name} className="flex justify-between items-center text-xs font-bold">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: sliceColors[(i + 3) % sliceColors.length] }} />
+                            <span style={{ color: 'var(--text-secondary)' }} className="truncate max-w-[150px]">{d.name}</span>
+                          </div>
+                          <span className="font-black text-[var(--text-primary)] shrink-0">{d.value} ({((d.value/totalCount)*100).toFixed(0)}%)</span>
+                        </div>
                       ))
                     )}
                   </div>
-
                 </div>
-
               </div>
-
               {/* ── Sub Charts Row ── */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
@@ -872,6 +922,55 @@ export default function LeadsDashboard() {
                         );
                       })
                     )}
+                  </div>
+
+                  {/* Dotted separator line */}
+                  <div className="border-t border-dashed my-4" style={{ borderColor: 'var(--border-subtle)' }} />
+
+                  {/* Section 2: Agents and Events Names breakdown */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-[var(--text-primary)]">Agents & Events Overview</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      
+                      {/* Active Agents list */}
+                      <div className="space-y-2">
+                        <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1">
+                          <User size={10} className="text-indigo-400" /> Active Agents
+                        </p>
+                        {activeAgents.length === 0 ? (
+                          <p className="text-[10px] italic text-[var(--text-ghost)] font-bold">No agents mapped</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {activeAgents.map((ag) => (
+                              <div key={ag.name} className="flex justify-between items-center text-[10px] font-bold p-2 rounded-xl bg-[var(--bg-hover)] border border-[var(--border-subtle)]">
+                                <span className="text-[var(--text-secondary)] truncate max-w-[90px]">{ag.name}</span>
+                                <span className="px-1.5 py-0.5 rounded-md text-[8px] font-black bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">{ag.count} leads</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Active Events list */}
+                      <div className="space-y-2">
+                        <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1">
+                          <Activity size={10} className="text-emerald-400" /> Active Events
+                        </p>
+                        {activeEvents.length === 0 ? (
+                          <p className="text-[10px] italic text-[var(--text-ghost)] font-bold">No events recorded</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {activeEvents.map((ev) => (
+                              <div key={ev.name} className="flex justify-between items-center text-[10px] font-bold p-2 rounded-xl bg-[var(--bg-hover)] border border-[var(--border-subtle)]">
+                                <span className="text-[var(--text-secondary)] truncate max-w-[90px]">{ev.name}</span>
+                                <span className="px-1.5 py-0.5 rounded-md text-[8px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{ev.count} leads</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
                   </div>
                 </div>
 
@@ -988,13 +1087,52 @@ export default function LeadsDashboard() {
                     <h3 className="text-xl md:text-2xl font-black text-[var(--text-primary)] mt-2">
                       {selectedLead.extracted_name || 'Anonymous Lead'}
                     </h3>
+                    {selectedLead.final_decision && (
+                      <span className={`inline-block px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border mt-1.5 ${
+                        selectedLead.final_decision.toLowerCase().includes('approve') || selectedLead.final_decision.toLowerCase() === 'yes'
+                          ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                          : selectedLead.final_decision.toLowerCase().includes('decline') || selectedLead.final_decision.toLowerCase() === 'no'
+                          ? 'bg-red-500/10 text-red-600 border-red-500/20'
+                          : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                      }`}>
+                        Status: {selectedLead.final_decision}
+                      </span>
+                    )}
                   </div>
-                  <button 
-                    onClick={() => setSelectedLead(null)}
-                    className="p-2 rounded-xl text-[var(--text-ghost)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
-                  >
-                    Close
-                  </button>
+                  
+                  {/* Actions Header Row */}
+                  <div className="flex items-center gap-2">
+                    {!isEditing ? (
+                      <button 
+                        onClick={handleStartEdit}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-[var(--purple-mid)] bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/10"
+                      >
+                        <Edit size={11} /> Edit
+                      </button>
+                    ) : (
+                      <>
+                        <button 
+                          onClick={handleSaveEdit}
+                          disabled={savingEdit}
+                          className="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/10"
+                        >
+                          {savingEdit ? 'Saving...' : 'Save'}
+                        </button>
+                        <button 
+                          onClick={handleCancelEdit}
+                          className="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-red-600 bg-red-500/10 hover:bg-red-500/20 border border-red-500/10"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
+                    <button 
+                      onClick={() => { setSelectedLead(null); setIsEditing(false); }}
+                      className="p-2 rounded-xl text-[var(--text-ghost)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors text-xs font-bold cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
 
                 {/* Subheader context */}
@@ -1005,7 +1143,7 @@ export default function LeadsDashboard() {
                   <div className="min-w-0">
                     <p className="text-xs font-black text-[var(--text-primary)] truncate">Session: {selectedLead.session_id.replace(/_/g, ' ')}</p>
                     <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] mt-0.5 truncate">
-                      Company: {selectedLead.owner_company || 'Independent'}
+                      Company: {selectedLead.owner_company || 'N/A'}
                     </p>
                   </div>
                 </div>
@@ -1019,29 +1157,65 @@ export default function LeadsDashboard() {
                     <div className="grid grid-cols-2 gap-3 text-xs p-4 rounded-2xl border" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border-subtle)' }}>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Mobile</p>
-                        <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.mobile || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.mobile || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.mobile || ''} 
+                            onChange={e => setEditForm({...editForm, mobile: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Email</p>
-                        <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.email || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.email || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.email || ''} 
+                            onChange={e => setEditForm({...editForm, email: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">ARN (Reference)</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <p className="font-black text-[var(--purple-mid)]">{selectedLead.arn || 'N/A'}</p>
-                          {selectedLead.arn && (
-                            <button 
-                              onClick={() => copyToClipboard(selectedLead.arn || '', 'drawer-arn')}
-                              className="text-[9px] text-[var(--purple-mid)] hover:underline flex items-center gap-0.5">
-                              {copiedId === 'drawer-arn' ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
-                              {copiedId === 'drawer-arn' ? 'Copied' : 'Copy'}
-                            </button>
-                          )}
-                        </div>
+                        {!isEditing ? (
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="font-black text-[var(--purple-mid)]">{selectedLead.arn || 'N/A'}</p>
+                            {selectedLead.arn && (
+                              <button 
+                                onClick={() => copyToClipboard(selectedLead.arn || '', 'drawer-arn')}
+                                className="text-[9px] text-[var(--purple-mid)] hover:underline flex items-center gap-0.5">
+                                {copiedId === 'drawer-arn' ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
+                                {copiedId === 'drawer-arn' ? 'Copied' : 'Copy'}
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.arn || ''} 
+                            onChange={e => setEditForm({...editForm, arn: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Customer Type</p>
-                        <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.customer_type || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.customer_type || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.customer_type || ''} 
+                            onChange={e => setEditForm({...editForm, customer_type: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1052,23 +1226,68 @@ export default function LeadsDashboard() {
                     <div className="grid grid-cols-2 gap-3 text-xs p-4 rounded-2xl border" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border-subtle)' }}>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">KYC Status</p>
-                        <p className="font-black text-[var(--text-primary)] mt-0.5">{selectedLead.kyc_status || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-black text-[var(--text-primary)] mt-0.5">{selectedLead.kyc_status || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.kyc_status || ''} 
+                            onChange={e => setEditForm({...editForm, kyc_status: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">VKYC Status</p>
-                        <p className="font-black text-[var(--text-primary)] mt-0.5">{selectedLead.vkyc_status || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-black text-[var(--text-primary)] mt-0.5">{selectedLead.vkyc_status || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.vkyc_status || ''} 
+                            onChange={e => setEditForm({...editForm, vkyc_status: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">VKYC Consent Date</p>
-                        <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.vkyc_consent_date || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.vkyc_consent_date || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.vkyc_consent_date || ''} 
+                            onChange={e => setEditForm({...editForm, vkyc_consent_date: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">VKYC Expiry Date</p>
-                        <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.vkyc_expiry_date || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.vkyc_expiry_date || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.vkyc_expiry_date || ''} 
+                            onChange={e => setEditForm({...editForm, vkyc_expiry_date: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div className="col-span-2 border-t pt-2 mt-1" style={{ borderColor: 'var(--border-subtle)' }}>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">KYC Success/NR Status</p>
-                        <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.kyc_success_nr || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.kyc_success_nr || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.kyc_success_nr || ''} 
+                            onChange={e => setEditForm({...editForm, kyc_success_nr: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1079,27 +1298,81 @@ export default function LeadsDashboard() {
                     <div className="grid grid-cols-2 gap-3 text-xs p-4 rounded-2xl border" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border-subtle)' }}>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Application ID</p>
-                        <p className="font-black text-[var(--text-primary)] mt-0.5">{selectedLead.application_id || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-black text-[var(--text-primary)] mt-0.5">{selectedLead.application_id || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.application_id || ''} 
+                            onChange={e => setEditForm({...editForm, application_id: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">LG Code</p>
-                        <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.lg_code || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.lg_code || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.lg_code || ''} 
+                            onChange={e => setEditForm({...editForm, lg_code: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Product Description</p>
-                        <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.product_des || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.product_des || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.product_des || ''} 
+                            onChange={e => setEditForm({...editForm, product_des: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Card Type</p>
-                        <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.card_type || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.card_type || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.card_type || ''} 
+                            onChange={e => setEditForm({...editForm, card_type: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Card Active Status</p>
-                        <p className="font-black text-[var(--text-primary)] mt-0.5">{selectedLead.card_active_status || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-black text-[var(--text-primary)] mt-0.5">{selectedLead.card_active_status || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.card_active_status || ''} 
+                            onChange={e => setEditForm({...editForm, card_active_status: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">IPA Status</p>
-                        <p className="font-black text-[var(--text-primary)] mt-0.5">{selectedLead.ipa_status || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-black text-[var(--text-primary)] mt-0.5">{selectedLead.ipa_status || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.ipa_status || ''} 
+                            onChange={e => setEditForm({...editForm, ipa_status: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1110,27 +1383,81 @@ export default function LeadsDashboard() {
                     <div className="grid grid-cols-2 gap-3 text-xs p-4 rounded-2xl border" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border-subtle)' }}>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Final Decision</p>
-                        <p className="font-black text-[var(--text-primary)] mt-0.5">{selectedLead.final_decision || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-black text-[var(--text-primary)] mt-0.5">{selectedLead.final_decision || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.final_decision || ''} 
+                            onChange={e => setEditForm({...editForm, final_decision: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Final Decision Date</p>
-                        <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.final_decision_date || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.final_decision_date || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.final_decision_date || ''} 
+                            onChange={e => setEditForm({...editForm, final_decision_date: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Current Stage</p>
-                        <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.current_stage || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.current_stage || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.current_stage || ''} 
+                            onChange={e => setEditForm({...editForm, current_stage: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Decline Type</p>
-                        <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.decline_type || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.decline_type || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.decline_type || ''} 
+                            onChange={e => setEditForm({...editForm, decline_type: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div className="col-span-2 border-t pt-2 mt-1" style={{ borderColor: 'var(--border-subtle)' }}>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">DropOff Reason</p>
-                        <p className="font-medium text-amber-600 mt-0.5">{selectedLead.dropoff_reason || 'No dropoff detected (Full flow complete)'}</p>
+                        {!isEditing ? (
+                          <p className="font-medium text-amber-600 mt-0.5">{selectedLead.dropoff_reason || 'No dropoff detected (Full flow complete)'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.dropoff_reason || ''} 
+                            onChange={e => setEditForm({...editForm, dropoff_reason: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div className="col-span-2 pt-1">
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Idcom Status</p>
-                        <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.idcom_status || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.idcom_status || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.idcom_status || ''} 
+                            onChange={e => setEditForm({...editForm, idcom_status: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1141,21 +1468,120 @@ export default function LeadsDashboard() {
                     <div className="grid grid-cols-2 gap-3 text-xs p-4 rounded-2xl border" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border-subtle)' }}>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">State</p>
-                        <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.state || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.state || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.state || ''} 
+                            onChange={e => setEditForm({...editForm, state: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Pincode</p>
-                        <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.pincode || 'N/A'}</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.pincode || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.pincode || ''} 
+                            onChange={e => setEditForm({...editForm, pincode: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                       <div className="col-span-2 border-t pt-2 mt-1" style={{ borderColor: 'var(--border-subtle)' }}>
                         <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Capture Link</p>
-                        <p className="font-bold mt-0.5">
-                          {selectedLead.capture_link ? (
-                            <a href={selectedLead.capture_link} target="_blank" rel="noreferrer" className="text-[var(--purple-mid)] hover:underline flex items-center gap-1">
-                              {selectedLead.capture_link} <ExternalLink size={10} />
-                            </a>
-                          ) : 'N/A'}
-                        </p>
+                        {!isEditing ? (
+                          <p className="font-bold mt-0.5">
+                            {selectedLead.capture_link ? (
+                              <a href={selectedLead.capture_link} target="_blank" rel="noreferrer" className="text-[var(--purple-mid)] hover:underline flex items-center gap-1">
+                                {selectedLead.capture_link} <ExternalLink size={10} />
+                              </a>
+                            ) : 'N/A'}
+                          </p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.capture_link || ''} 
+                            onChange={e => setEditForm({...editForm, capture_link: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Location & Agent Details */}
+                  <div className="space-y-2">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-blue-500">Location & Agent Details</p>
+                    <div className="grid grid-cols-2 gap-3 text-xs p-4 rounded-2xl border" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border-subtle)' }}>
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Executive Name</p>
+                        {!isEditing ? (
+                          <p className="font-black text-[var(--text-primary)] mt-0.5">{selectedLead.executive_name || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.executive_name || ''} 
+                            onChange={e => setEditForm({...editForm, executive_name: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Executive Code</p>
+                        {!isEditing ? (
+                          <p className="font-black text-[var(--text-primary)] mt-0.5">{selectedLead.executive_code || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.executive_code || ''} 
+                            onChange={e => setEditForm({...editForm, executive_code: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">City</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.agent_city || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.agent_city || ''} 
+                            onChange={e => setEditForm({...editForm, agent_city: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Place / Area</p>
+                        {!isEditing ? (
+                          <p className="font-bold text-[var(--text-primary)] mt-0.5">{selectedLead.agent_place || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.agent_place || ''} 
+                            onChange={e => setEditForm({...editForm, agent_place: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
+                      </div>
+                      <div className="col-span-2 border-t pt-2 mt-1" style={{ borderColor: 'var(--border-subtle)' }}>
+                        <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Venue / Retail Store</p>
+                        {!isEditing ? (
+                          <p className="font-black text-[var(--purple-mid)] mt-0.5">{selectedLead.agent_venue || 'N/A'}</p>
+                        ) : (
+                          <input 
+                            type="text" 
+                            value={editForm.agent_venue || ''} 
+                            onChange={e => setEditForm({...editForm, agent_venue: e.target.value})}
+                            className="input-dark w-full px-2.5 py-1 rounded-md text-xs font-bold mt-1 focus:ring-1 focus:ring-[var(--purple-mid)]"
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1165,9 +1591,17 @@ export default function LeadsDashboard() {
                     <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)]">Administrative Log & Remarks</p>
                     <div className="p-4 rounded-2xl border text-xs" style={{ background: 'var(--bg-deep)', borderColor: 'var(--border-subtle)' }}>
                       <p className="text-[9px] font-black uppercase tracking-wider text-[var(--text-muted)]">Remarks</p>
-                      <p className="font-medium text-[var(--text-primary)] mt-1.5 italic">
-                        "{selectedLead.remarks || 'No notes added for this entity.'}"
-                      </p>
+                      {!isEditing ? (
+                        <p className="font-medium text-[var(--text-primary)] mt-1.5 italic">
+                          "{selectedLead.remarks || 'No notes added for this entity.'}"
+                        </p>
+                      ) : (
+                        <textarea 
+                          value={editForm.remarks || ''} 
+                          onChange={e => setEditForm({...editForm, remarks: e.target.value})}
+                          className="input-dark w-full px-2.5 py-1.5 rounded-md text-xs font-medium mt-1 focus:ring-1 focus:ring-[var(--purple-mid)] h-20 resize-none"
+                        />
+                      )}
                     </div>
                   </div>
 

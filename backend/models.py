@@ -63,8 +63,27 @@ class Contact(SQLModel, table=True):
     application_id: Optional[str] = Field(default=None, nullable=True)
     remarks: Optional[str] = Field(default=None, nullable=True)
 
+    # Location & Agent Details (Populated from matched Agent code)
+    executive_name: Optional[str] = Field(default=None, nullable=True)
+    executive_code: Optional[str] = Field(default=None, nullable=True)
+    agent_city: Optional[str] = Field(default=None, nullable=True)
+    agent_place: Optional[str] = Field(default=None, nullable=True)
+    agent_venue: Optional[str] = Field(default=None, nullable=True)
+
     # Tracking match
     excel_updated: bool = Field(default=False, nullable=True)
     excel_updated_at: Optional[datetime] = Field(default=None, nullable=True)
+
+
+class Agent(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    lg_code: str = Field(index=True)
+    executive_name: str
+    executive_code: str
+    city: str
+    place: str
+    venue: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 

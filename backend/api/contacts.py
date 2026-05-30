@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlmodel import Session, select
 from database import get_session
-from models import Contact, WhatsAppSession, User
+from models import Contact, WhatsAppSession, User, Agent
 from typing import List, Optional
 from datetime import datetime
 import datetime as dt_module
@@ -32,8 +32,8 @@ FIELD_MAPPINGS = {
     "product_des": ["productdes", "productdescription", "productdesc"],
     "kyc_success_nr": ["kycsuccessnr", "kycsuccess", "kycnr"],
     "card_type": ["cardtype", "card"],
-    "card_active_status": ["cardactivestatus", "cardactive"],
-    "application_id": ["applicationid", "appid"],
+    "card_active_status": ["cardactivestatus", "cardactive", "cardactivationstate", "cardactivatestate"],
+    "application_id": ["applicationid", "appid", "applicationno"],
     "remarks": ["remarks", "remark"]
 }
 
@@ -48,6 +48,38 @@ class ContactUpdate(BaseModel):
     company: Optional[str] = None
     lead_score: Optional[str] = None
     arn: Optional[str] = None
+
+    # Excel Matched Fields
+    creation_date_time: Optional[str] = None
+    customer_type: Optional[str] = None
+    state: Optional[str] = None
+    pincode: Optional[str] = None
+    lg_code: Optional[str] = None
+    ipa_status: Optional[str] = None
+    dropoff_reason: Optional[str] = None
+    idcom_status: Optional[str] = None
+    vkyc_status: Optional[str] = None
+    vkyc_consent_date: Optional[str] = None
+    vkyc_expiry_date: Optional[str] = None
+    capture_link: Optional[str] = None
+    final_decision: Optional[str] = None
+    final_decision_date: Optional[str] = None
+    current_stage: Optional[str] = None
+    kyc_status: Optional[str] = None
+    decline_type: Optional[str] = None
+    product_des: Optional[str] = None
+    kyc_success_nr: Optional[str] = None
+    card_type: Optional[str] = None
+    card_active_status: Optional[str] = None
+    application_id: Optional[str] = None
+    remarks: Optional[str] = None
+
+    # Location & Agent Details
+    executive_name: Optional[str] = None
+    executive_code: Optional[str] = None
+    agent_city: Optional[str] = None
+    agent_place: Optional[str] = None
+    agent_venue: Optional[str] = None
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
 
@@ -375,12 +407,12 @@ async def update_contact(
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role != "superadmin":
-        raise HTTPException(status_code=403, detail="Forbidden: Only superadmins are allowed to edit leads")
-        
     contact = db.get(Contact, contact_id)
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
+        
+    if current_user.role != "superadmin" and contact.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden: You do not own this lead entry")
         
     update_data = contact_update.dict(exclude_unset=True)
     for key, value in update_data.items():
@@ -391,25 +423,13 @@ async def update_contact(
     db.refresh(contact)
     
     owner = db.get(User, contact.user_id)
-    enriched_contact = {
-        "id": contact.id,
-        "extracted_name": contact.extracted_name,
-        "mobile": contact.mobile,
-        "email": contact.email,
-        "arn": contact.arn,
-        "company": contact.company,
-        "lead_score": contact.lead_score,
-        "confidence": contact.confidence,
-        "source_message": contact.source_message,
-        "source_type": contact.source_type,
-        "session_id": contact.session_id,
-        "wa_jid": contact.wa_jid,
-        "group_jid": contact.group_jid,
-        "created_at": contact.created_at.isoformat() if hasattr(contact.created_at, 'isoformat') else str(contact.created_at),
-        "owner_company": owner.company_name if owner else None,
-        "owner_name": owner.display_name if owner else None,
-        "owner_email": owner.email if owner else None,
-    }
+    enriched_contact = contact.dict()
+    enriched_contact["created_at"] = contact.created_at.isoformat() if hasattr(contact.created_at, 'isoformat') else str(contact.created_at)
+    if contact.excel_updated_at:
+        enriched_contact["excel_updated_at"] = contact.excel_updated_at.isoformat() if hasattr(contact.excel_updated_at, 'isoformat') else str(contact.excel_updated_at)
+    enriched_contact["owner_company"] = owner.company_name if owner else None
+    enriched_contact["owner_name"] = owner.display_name if owner else None
+    enriched_contact["owner_email"] = owner.email if owner else None
     
     from core.ws import manager
     await manager.broadcast({
@@ -493,6 +513,7 @@ async def upload_excel(
     total_rows = len(df)
     matched_count = 0
     unmatched_arns = []
+    unmatched_seen = set()
     
     for idx, row in df.iterrows():
         arn_val = row[arn_column_original]
@@ -532,10 +553,38 @@ async def upload_excel(
             lead.excel_updated = True
             lead.excel_updated_at = datetime.utcnow()
             
+            # Look up and populate Location & Agent details from matching lg_code
+            if lead.lg_code:
+                lg_clean = str(lead.lg_code).strip()
+                agent_info = db.exec(
+                    select(Agent)
+                    .where(Agent.lg_code == lg_clean)
+                    .where(Agent.user_id == lead.user_id)
+                ).first()
+                if agent_info:
+                    lead.executive_name = agent_info.executive_name
+                    lead.executive_code = agent_info.executive_code
+                    lead.agent_city = agent_info.city
+                    lead.agent_place = agent_info.place
+                    lead.agent_venue = agent_info.venue
+            
             db.add(lead)
             matched_count += 1
         else:
-            unmatched_arns.append(arn_str)
+            if arn_str not in unmatched_seen:
+                unmatched_seen.add(arn_str)
+                # Check why it's unmatched (exist globally vs absent)
+                global_lead = db.exec(select(Contact).where(Contact.arn == arn_str)).first()
+                if global_lead:
+                    unmatched_arns.append({
+                        "arn": arn_str,
+                        "reason": "Belongs to another company"
+                    })
+                else:
+                    unmatched_arns.append({
+                        "arn": arn_str,
+                        "reason": "Not found in database"
+                    })
             
     db.commit()
     
@@ -557,7 +606,7 @@ async def upload_excel(
         "status": "success",
         "total_rows": total_rows,
         "matched_count": matched_count,
-        "unmatched_arns": unmatched_arns[:100],
+        "unmatched_arns": unmatched_arns,
         "unmatched_count": len(unmatched_arns),
         "mapped_columns": mapped_columns
     }
@@ -639,6 +688,12 @@ async def export_matched_contacts(
             "Card Active Status": c.card_active_status or "",
             "Application ID": c.application_id or "",
             "Remarks": c.remarks or "",
+            # Location & Agent Details
+            "Executive Name": c.executive_name or "",
+            "Executive Code": c.executive_code or "",
+            "City": c.agent_city or "",
+            "Place": c.agent_place or "",
+            "Venue": c.agent_venue or "",
             "Excel Match Synced At": c.excel_updated_at.strftime("%Y-%m-%d %H:%M:%S") if c.excel_updated_at else ""
         })
         
