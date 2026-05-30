@@ -135,10 +135,18 @@ def get_contacts(
             for lead in agent_leads:
                 lg_val = str(lead.lg_code).strip()
                 if lg_val and lg_val.upper() != "N/A" and lg_val != "":
-                    if not lead.executive_name or lead.executive_name.strip() in ["", "N/A"]:
-                        key = (lead.user_id, lg_val.upper())
-                        if key in agent_map:
-                            agent_info = agent_map[key]
+                    key = (lead.user_id, lg_val.upper())
+                    if key in agent_map:
+                        agent_info = agent_map[key]
+                        # Heal if unpopulated OR if details differ from latest database values
+                        if (not lead.executive_name or 
+                            lead.executive_name.strip() in ["", "N/A"] or
+                            lead.executive_name != agent_info.executive_name or
+                            lead.executive_code != agent_info.executive_code or
+                            lead.agent_city != agent_info.city or
+                            lead.agent_place != agent_info.place or
+                            lead.agent_venue != agent_info.venue):
+                            
                             lead.executive_name = agent_info.executive_name
                             lead.executive_code = agent_info.executive_code
                             lead.agent_city = agent_info.city

@@ -46,32 +46,42 @@ async def create_agent(
     ).first()
     
     if existing:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Agent with LG Code '{lg_code_clean}' already exists in your workspace."
+        # Update existing agent's details
+        existing.executive_name = agent_in.executive_name.strip()
+        existing.executive_code = agent_in.executive_code.strip()
+        existing.city = agent_in.city.strip()
+        existing.place = agent_in.place.strip()
+        existing.venue = agent_in.venue.strip()
+        db.add(existing)
+        db.commit()
+        db.refresh(existing)
+        db_agent = existing
+    else:
+        # Create a new agent entry
+        db_agent = Agent(
+            user_id=current_user.id,
+            lg_code=lg_code_clean,
+            executive_name=agent_in.executive_name.strip(),
+            executive_code=agent_in.executive_code.strip(),
+            city=agent_in.city.strip(),
+            place=agent_in.place.strip(),
+            venue=agent_in.venue.strip()
         )
-        
-    db_agent = Agent(
-        user_id=current_user.id,
-        lg_code=lg_code_clean,
-        executive_name=agent_in.executive_name.strip(),
-        executive_code=agent_in.executive_code.strip(),
-        city=agent_in.city.strip(),
-        place=agent_in.place.strip(),
-        venue=agent_in.venue.strip()
-    )
-    db.add(db_agent)
-    db.commit()
-    db.refresh(db_agent)
+        db.add(db_agent)
+        db.commit()
+        db.refresh(db_agent)
     
     # Automatically sweep and populate existing contacts matching this lg_code
     try:
         from models import Contact
         from core.ws import manager
-        existing_contacts = db.exec(
-            select(Contact)
-            .where(Contact.user_id == current_user.id)
-        ).all()
+        
+        # Superadmins sweep all contacts; standard users sweep their own contacts
+        statement = select(Contact)
+        if current_user.role != "superadmin":
+            statement = statement.where(Contact.user_id == current_user.id)
+            
+        existing_contacts = db.exec(statement).all()
         swept = False
         for c in existing_contacts:
             if c.lg_code and c.lg_code.strip().upper() == lg_code_clean.upper():
@@ -82,6 +92,7 @@ async def create_agent(
                 c.agent_venue = db_agent.venue
                 db.add(c)
                 swept = True
+                
         if swept:
             db.commit()
             await manager.broadcast({
