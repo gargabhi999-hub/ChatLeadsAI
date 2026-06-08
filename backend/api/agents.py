@@ -27,7 +27,7 @@ class AgentResponse(BaseModel):
     user_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 @router.post("/", response_model=AgentResponse, status_code=status.HTTP_201_CREATED)
 async def create_agent(
