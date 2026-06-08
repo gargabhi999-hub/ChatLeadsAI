@@ -15,6 +15,10 @@ interface CompanyUser {
   max_sessions: number;
   is_active: boolean;
   allow_bulk: boolean;
+  allow_name: boolean;
+  allow_mobile: boolean;
+  allow_email: boolean;
+  allow_arn: boolean;
 }
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
@@ -34,6 +38,10 @@ export default function CompaniesPage() {
   const [companyName, setCompanyName] = useState('');
   const [maxSessions, setMaxSessions] = useState(3);
   const [allowBulk, setAllowBulk] = useState(false);
+  const [allowName, setAllowName] = useState(true);
+  const [allowMobile, setAllowMobile] = useState(true);
+  const [allowEmail, setAllowEmail] = useState(true);
+  const [allowArn, setAllowArn] = useState(true);
   const [formError, setFormError] = useState('');
 
   // Fetch registered companies
@@ -83,6 +91,10 @@ export default function CompaniesPage() {
         company_name: companyName.trim(),
         max_sessions: Number(maxSessions),
         allow_bulk: allowBulk,
+        allow_name: allowName,
+        allow_mobile: allowMobile,
+        allow_email: allowEmail,
+        allow_arn: allowArn,
       };
 
       if (!isEditing || password.trim()) {
@@ -114,6 +126,10 @@ export default function CompaniesPage() {
       setCompanyName('');
       setMaxSessions(3);
       setAllowBulk(false);
+      setAllowName(true);
+      setAllowMobile(true);
+      setAllowEmail(true);
+      setAllowArn(true);
       
       // Refresh list
       fetchCompanies();
@@ -131,6 +147,10 @@ export default function CompaniesPage() {
     setCompanyName(user.company_name);
     setMaxSessions(user.max_sessions);
     setAllowBulk(user.allow_bulk || false);
+    setAllowName(user.allow_name !== false);
+    setAllowMobile(user.allow_mobile !== false);
+    setAllowEmail(user.allow_email !== false);
+    setAllowArn(user.allow_arn !== false);
     setPassword(''); // leave blank for no change
     setModalOpen(true);
   };
@@ -142,6 +162,10 @@ export default function CompaniesPage() {
     setCompanyName('');
     setMaxSessions(3);
     setAllowBulk(false);
+    setAllowName(true);
+    setAllowMobile(true);
+    setAllowEmail(true);
+    setAllowArn(true);
     setPassword('');
     setModalOpen(true);
   };
@@ -301,12 +325,23 @@ export default function CompaniesPage() {
                       </div>
                     </td>
                     <td className="py-6 px-6">
-                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                        user.allow_bulk 
-                          ? 'bg-purple-50 border border-purple-100 text-[var(--purple-mid)]' 
-                          : 'bg-gray-100/10 border border-[var(--border-subtle)] text-[var(--text-ghost)]'
-                      }`}>
-                        {user.allow_bulk ? 'Enabled' : 'Disabled'}
+                      <div className="flex flex-col gap-1.5">
+                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest w-fit ${
+                          user.allow_bulk 
+                            ? 'bg-purple-50 border border-purple-100 text-[var(--purple-mid)]' 
+                            : 'bg-gray-100/10 border border-[var(--border-subtle)] text-[var(--text-ghost)]'
+                        }`}>
+                          {user.allow_bulk ? 'Bulk Enabled' : 'Bulk Disabled'}
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {user.allow_name !== false && <span className="text-[8px] font-black uppercase tracking-widest bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded">Name</span>}
+                          {user.allow_mobile !== false && <span className="text-[8px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded">Mobile</span>}
+                          {user.allow_email !== false && <span className="text-[8px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded">Email</span>}
+                          {user.allow_arn !== false && <span className="text-[8px] font-black uppercase tracking-widest bg-indigo-500/10 text-indigo-500 px-1.5 py-0.5 rounded">ARN</span>}
+                          {user.allow_name === false && user.allow_mobile === false && user.allow_email === false && user.allow_arn === false && (
+                            <span className="text-[8px] font-black uppercase tracking-widest bg-red-500/10 text-red-500 px-1.5 py-0.5 rounded">None Allowed</span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="py-6 px-6">
@@ -421,6 +456,68 @@ export default function CompaniesPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-black text-[var(--text-primary)] text-xs">Bulk Data Access</p>
                   <p className="text-[10px] font-medium text-[var(--text-secondary)] mt-0.5">Allow this company to parse and approve bulk leads from Excel screenshots.</p>
+                </div>
+              </div>
+
+              {/* Stacked 2x2 Grid of Permitted Fields */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-[var(--text-secondary)]">Lead Fields Permissions</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Name Checkbox */}
+                  <div className="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer hover:bg-opacity-80 transition-all"
+                    style={{ background: 'var(--bg-hover)', borderColor: 'var(--border-subtle)' }}
+                    onClick={() => setAllowName(v => !v)}>
+                    <input type="checkbox" className="w-4 h-4 rounded text-[var(--purple-mid)] focus:ring-[var(--purple-mid)] cursor-pointer"
+                      checked={allowName}
+                      onChange={(e) => e.stopPropagation()}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-[var(--text-primary)] text-xs">Extract Names</p>
+                      <p className="text-[9px] font-medium text-[var(--text-secondary)] mt-0.5">Identify lead names</p>
+                    </div>
+                  </div>
+
+                  {/* Mobile Checkbox */}
+                  <div className="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer hover:bg-opacity-80 transition-all"
+                    style={{ background: 'var(--bg-hover)', borderColor: 'var(--border-subtle)' }}
+                    onClick={() => setAllowMobile(v => !v)}>
+                    <input type="checkbox" className="w-4 h-4 rounded text-[var(--purple-mid)] focus:ring-[var(--purple-mid)] cursor-pointer"
+                      checked={allowMobile}
+                      onChange={(e) => e.stopPropagation()}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-[var(--text-primary)] text-xs">Extract Mobile</p>
+                      <p className="text-[9px] font-medium text-[var(--text-secondary)] mt-0.5">Identify phone numbers</p>
+                    </div>
+                  </div>
+
+                  {/* Email Checkbox */}
+                  <div className="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer hover:bg-opacity-80 transition-all"
+                    style={{ background: 'var(--bg-hover)', borderColor: 'var(--border-subtle)' }}
+                    onClick={() => setAllowEmail(v => !v)}>
+                    <input type="checkbox" className="w-4 h-4 rounded text-[var(--purple-mid)] focus:ring-[var(--purple-mid)] cursor-pointer"
+                      checked={allowEmail}
+                      onChange={(e) => e.stopPropagation()}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-[var(--text-primary)] text-xs">Extract Emails</p>
+                      <p className="text-[9px] font-medium text-[var(--text-secondary)] mt-0.5">Identify email addresses</p>
+                    </div>
+                  </div>
+
+                  {/* ARN Checkbox */}
+                  <div className="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer hover:bg-opacity-80 transition-all"
+                    style={{ background: 'var(--bg-hover)', borderColor: 'var(--border-subtle)' }}
+                    onClick={() => setAllowArn(v => !v)}>
+                    <input type="checkbox" className="w-4 h-4 rounded text-[var(--purple-mid)] focus:ring-[var(--purple-mid)] cursor-pointer"
+                      checked={allowArn}
+                      onChange={(e) => e.stopPropagation()}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-[var(--text-primary)] text-xs">Extract ARN Ref</p>
+                      <p className="text-[9px] font-medium text-[var(--text-secondary)] mt-0.5">Identify application IDs</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 

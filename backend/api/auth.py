@@ -23,8 +23,11 @@ class TokenResponse(BaseModel):
     display_name: str
     email: str
     company_name: Optional[str] = None
-    max_sessions: int
     allow_bulk: bool = False
+    allow_name: bool = True
+    allow_mobile: bool = True
+    allow_email: bool = True
+    allow_arn: bool = True
 
 class LoginRequest(BaseModel):
     email: str
@@ -89,7 +92,11 @@ def process_login(email: str, password: str, source: Optional[str], db: Session)
         "email": user.email,
         "company_name": user.company_name,
         "max_sessions": user.max_sessions,
-        "allow_bulk": user.allow_bulk
+        "allow_bulk": user.allow_bulk,
+        "allow_name": user.allow_name,
+        "allow_mobile": user.allow_mobile,
+        "allow_email": user.allow_email,
+        "allow_arn": user.allow_arn
     }
 
 @router.post("/login", response_model=TokenResponse)

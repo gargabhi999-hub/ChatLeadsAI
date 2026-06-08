@@ -60,9 +60,11 @@ def migrate_db(engine):
                         default_str = " DEFAULT TRUE"
                     elif col_name == "allow_bulk":
                         default_str = " DEFAULT FALSE"
+                    elif col_name in ["allow_name", "allow_mobile", "allow_email", "allow_arn"]:
+                        default_str = " DEFAULT TRUE"
                     
                     # If column is not nullable and has no default, add it as nullable to avoid errors
-                    nullable_str = " NULL" if col.nullable or (col.default is None and col_name not in ["created_at", "display_name", "role", "max_sessions", "is_active", "allow_bulk"]) else " NOT NULL"
+                    nullable_str = " NULL" if col.nullable or (col.default is None and col_name not in ["created_at", "display_name", "role", "max_sessions", "is_active", "allow_bulk", "allow_name", "allow_mobile", "allow_email", "allow_arn"]) else " NOT NULL"
                     
                     query = f'ALTER TABLE "{table_name}" ADD COLUMN "{col_name}" {col_type}{default_str}{nullable_str}'
                     logger.info(f"Executing: {query}")

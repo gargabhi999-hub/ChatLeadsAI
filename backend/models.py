@@ -12,6 +12,10 @@ class User(SQLModel, table=True):
     max_sessions: int = Field(default=5)  # quota limit of whatsapp sessions
     is_active: bool = True
     allow_bulk: bool = Field(default=False)
+    allow_name: bool = Field(default=True)
+    allow_mobile: bool = Field(default=True)
+    allow_email: bool = Field(default=True)
+    allow_arn: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class WhatsAppSession(SQLModel, table=True):

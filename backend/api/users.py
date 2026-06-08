@@ -17,6 +17,10 @@ class UserResponse(BaseModel):
     max_sessions: int
     is_active: bool
     allow_bulk: bool
+    allow_name: bool
+    allow_mobile: bool
+    allow_email: bool
+    allow_arn: bool
 
 class CompanyUserCreate(BaseModel):
     display_name: str
@@ -25,6 +29,10 @@ class CompanyUserCreate(BaseModel):
     company_name: str
     max_sessions: int = 5
     allow_bulk: bool = False
+    allow_name: bool = True
+    allow_mobile: bool = True
+    allow_email: bool = True
+    allow_arn: bool = True
 
 class CompanyUserUpdate(BaseModel):
     display_name: Optional[str] = None
@@ -33,6 +41,10 @@ class CompanyUserUpdate(BaseModel):
     company_name: Optional[str] = None
     max_sessions: Optional[int] = None
     allow_bulk: Optional[bool] = None
+    allow_name: Optional[bool] = None
+    allow_mobile: Optional[bool] = None
+    allow_email: Optional[bool] = None
+    allow_arn: Optional[bool] = None
 
 @router.get("/", response_model=List[UserResponse])
 def list_users(
@@ -78,7 +90,11 @@ def create_company_user(
         role="user",
         company_name=payload.company_name,
         max_sessions=payload.max_sessions,
-        allow_bulk=payload.allow_bulk
+        allow_bulk=payload.allow_bulk,
+        allow_name=payload.allow_name,
+        allow_mobile=payload.allow_mobile,
+        allow_email=payload.allow_email,
+        allow_arn=payload.allow_arn
     )
     
     db.add(new_user)
@@ -158,6 +174,14 @@ def update_company_user(
         target_user.max_sessions = payload.max_sessions
     if payload.allow_bulk is not None:
         target_user.allow_bulk = payload.allow_bulk
+    if payload.allow_name is not None:
+        target_user.allow_name = payload.allow_name
+    if payload.allow_mobile is not None:
+        target_user.allow_mobile = payload.allow_mobile
+    if payload.allow_email is not None:
+        target_user.allow_email = payload.allow_email
+    if payload.allow_arn is not None:
+        target_user.allow_arn = payload.allow_arn
     if payload.password:
         target_user.hashed_password = get_password_hash(payload.password)
 

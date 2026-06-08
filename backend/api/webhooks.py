@@ -58,6 +58,10 @@ async def process_lead_background(msg: WhatsAppMessage, image_bytes: Optional[by
             # Check if session owner has bulk features enabled
             owner_user = db.get(User, session.user_id)
             allow_bulk = owner_user.allow_bulk if owner_user else False
+            allow_name = owner_user.allow_name if owner_user else True
+            allow_mobile = owner_user.allow_mobile if owner_user else True
+            allow_email = owner_user.allow_email if owner_user else True
+            allow_arn = owner_user.allow_arn if owner_user else True
 
             # Check if this is a bulk excel screenshot
             is_excel = bool(extracted.get('is_excel_screenshot', False)) and allow_bulk
@@ -67,10 +71,10 @@ async def process_lead_background(msg: WhatsAppMessage, image_bytes: Optional[by
                 print(f"📊 BULK Excel Screenshot Detected! Found {len(leads)} rows.")
                 added_bulk_count = 0
                 for idx, lead in enumerate(leads):
-                    l_name = lead.get('name', 'absent')
-                    l_mobile = lead.get('mobile', 'absent')
-                    l_email = lead.get('email', 'absent')
-                    l_arn = lead.get('arn', 'absent')
+                    l_name = lead.get('name', 'absent') if allow_name else 'absent'
+                    l_mobile = lead.get('mobile', 'absent') if allow_mobile else 'absent'
+                    l_email = lead.get('email', 'absent') if allow_email else 'absent'
+                    l_arn = lead.get('arn', 'absent') if allow_arn else 'absent'
                     
                     # Validate and sanitize
                     has_contact_info = False
@@ -168,10 +172,10 @@ async def process_lead_background(msg: WhatsAppMessage, image_bytes: Optional[by
                     print(f"⚠️ Broadcast error: {ws_err}")
                 return
             
-            name = extracted.get('name', 'absent')
-            mobile = extracted.get('mobile', 'absent')
-            email = extracted.get('email', 'absent')
-            arn = extracted.get('arn', 'absent')
+            name = extracted.get('name', 'absent') if allow_name else 'absent'
+            mobile = extracted.get('mobile', 'absent') if allow_mobile else 'absent'
+            email = extracted.get('email', 'absent') if allow_email else 'absent'
+            arn = extracted.get('arn', 'absent') if allow_arn else 'absent'
             
             print(f"📊 Extracted from THIS message - Name: {name}, Mobile: {mobile}, Email: {email}, ARN: {arn}")
             
