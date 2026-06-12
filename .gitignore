@@ -53,3 +53,14 @@ services/whatsapp/.env
 services/whatsapp/auth/
 services/whatsapp/auth_info/
 services/whatsapp/media/
+
+# Git Remotes and Push Commands
+# Abhi:
+# git remote add origin https://github.com/gargabhi999-hub/ChatLeadsAI.git
+# git branch -M main
+# git push -u origin main
+
+# Lakshay:
+# git remote add origin https://github.com/lakshayb0052/ChatLeadsAI.git
+# git branch -M main
+# git push -u origin main
